@@ -1,6 +1,6 @@
 {
   "name": "@lazyoft/jev-explorer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,8 +9,11 @@
   "scripts": {
     "start": "node bin/jev-explorer.mjs",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "test:live": "node --test --test-concurrency=1 --test-timeout=120000 test/live.mjs",
-    "check": "node --check src/explore-browser.mjs && node --check src/server.mjs && node --check src/main.mjs && node --check src/compact.mjs && npm test"
+    "test:live": "node --env-file-if-exists=.env --test --test-concurrency=1 --test-timeout=120000 test/live.mjs",
+    "check": "npm run build && npm test",
+    "build": "tsc",
+    "prepack": "npm run build",
+    "test:live:typed": "node --env-file-if-exists=.env --test --test-timeout=120000 test/typed-live.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
@@ -19,7 +22,9 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
-    "playwright": "1.63.0"
+    "@types/node": "24.13.6",
+    "playwright": "1.63.0",
+    "typescript": "5.9.3"
   },
   "description": "Goal-driven browser exploration with Jev, compact evidence, and persistent supervisor handoff over MCP.",
   "license": "Apache-2.0",
@@ -36,7 +41,9 @@
   },
   "files": [
     "bin",
+    "dist",
     "src",
+    "tsconfig.json",
     "docs",
     "README.md",
     "LICENSE",

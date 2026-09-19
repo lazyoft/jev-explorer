@@ -1,12 +1,12 @@
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { BrowserExplorer } from './explore-browser.mjs';
-import { createExplorerServer } from './server.mjs';
+import { BrowserExplorer } from './explore-browser.js';
+import { createExplorerServer } from './server.js';
 
 const root = process.env.JEV_EXPLORER_RUNS ?? join(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'jev-explorer', 'runs');
 const explorer = new BrowserExplorer({ root });
-let closing;
+let closing: Promise<void> | undefined;
 const stop = () => closing ??= explorer.shutdown();
 const handle = serveStdio(() => {
   const server = createExplorerServer(explorer);

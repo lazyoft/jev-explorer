@@ -35,6 +35,7 @@ Requires **Node.js 24+**. An API key is needed for Jev inference. Native inspect
 git clone https://github.com/lazyoft/jev-explorer.git
 cd jev-explorer
 npm ci --ignore-scripts
+npm run build
 npx playwright install chromium
 cp .env.example .env
 ```
@@ -113,6 +114,29 @@ When the task needs information that was not supplied, use `jev_continue`:
 
 Input values come from the caller or observed sources. Jev chooses controls and values; it does not generate free-form prose. This prototype asks the supervising agent when it needs a new string rather than guessing it.
 
+## Typed input data
+
+Supply known data separately from the objective. Jev chooses whether to fill and which datum belongs in each observed field. The server copies the selected value, formats dates, executes through a current browser reference, and checks the value and field validity afterwards.
+
+```json
+{
+  "url": "https://example.com/search",
+  "objective": "Fill the travel search with the supplied data and show availability.",
+  "data": {
+    "destination": { "type": "text", "value": "Harbor City", "description": "Travel destination" },
+    "arrival": { "type": "date", "value": "2030-04-11", "description": "Check-in date" },
+    "departure": { "type": "date", "value": "2030-04-14", "description": "Check-out date" },
+    "adults": { "type": "number", "value": 2, "description": "Number of adults" }
+  }
+}
+```
+
+Use `data` or legacy `values` in an exploration, not both. `jev_continue` accepts additional or replacement `data` items. A verified field is checked again when it remains visible; changing its supplied datum or its displayed value makes it eligible for filling again. Data is available to the workflow, not a requirement to fill every item on every page.
+
+The first adapters support text inputs, native date inputs, text dates with an explicit format, number inputs, checkboxes and single native selects. Date values must be real calendar dates in `YYYY-MM-DD` form. For text controls, supported visible hints are `DD/MM/YYYY`, `MM/DD/YYYY`, `DD.MM.YYYY`, `DD-MM-YYYY`, `YYYY/MM/DD` and `YYYY-MM-DD`, including Italian `gg/mm/aaaa`. No day/month order is guessed. Custom calendars, split date controls and custom autocomplete selection are not implemented by this adapter and can require handoff.
+
+Field/data associations and the fill/navigation decision are requested together. Native select options are chosen in a further grounded decision using the supplied value. Model selection cannot manufacture a new value. `typedInputs` reports which datum was read back in which field; it does not certify a reservation, a saved record, or continued correctness after a later page transition.
+
 ## Tools
 
 | Tool | Purpose |
@@ -160,10 +184,13 @@ npm run check
 
 Tests use real local browsers, synthetic applications, deterministic model decisions, and independent checks of saved records. No API key is needed for the default suite.
 
-For an opt-in test with actual Jev calls:
+Source code is TypeScript with `strict` enabled. `npm run build` emits `dist/`; the existing `.mjs` command-line launcher remains compatible with client configurations. Build after pulling source changes.
+
+For opt-in tests with actual Jev calls:
 
 ```sh
-node --env-file=.env --test --test-concurrency=1 --test-timeout=120000 test/live.mjs
+npm run test:live
+npm run test:live:typed
 ```
 
 This makes paid API calls using synthetic local data. It does not run in CI or use real accounts. Local results are not a benchmark of arbitrary websites.

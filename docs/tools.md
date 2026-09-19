@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | `objective` | Required | The result to pursue and relevant constraints |
 | `url` / `sessionId` | One required | Starting page or retained session |
+| `data` | `{}` | Up to 32 typed items: `{type, value, description?}`; types are `text`, `date`, `number`, `boolean` |
 | `values` | `{}` | Supplied input data; nested objects are supported |
 | `questions` | `[]` | Up to eight `{key, question}` source-extraction requests |
 | `allowCommit` | `false` | Allow only submission effects explicitly authorized by the objective |
@@ -40,7 +41,7 @@ Other supported actions are `hover`, `press_key`, `select_option`, `check`, `nav
 
 ## Continue
 
-`jev_continue({sessionId, note?, values?, facts?})` resumes the same objective. `facts` are caller-supplied `{key, value, url?}` records and remain distinguishable from observations. New values replace the corresponding supplied values. Historical findings are not treated as currently visible until their source context is observed again.
+`jev_continue({sessionId, note?, values?, data?, facts?})` resumes the same objective. `facts` are caller-supplied `{key, value, url?}` records and remain distinguishable from observations. New values replace the corresponding supplied values. Historical findings are not treated as currently visible until their source context is observed again.
 
 If a submission outcome is unknown, continuation requires `effectResolution` and a nonempty evidence-backed `note`:
 
@@ -59,3 +60,11 @@ The compact result includes status, reason, underlying `workflowOutcome`, curren
 - `screen.png`: last captured viewport.
 
 `sessionAlive` describes the session when the result is returned. `jev_close` or server shutdown ends that session. Persisted evidence does not restore a browser or justify replaying effects.
+
+## Typed input behavior
+
+`data` and nonempty legacy `values` are mutually exclusive, including during continuation. Dates are validated before a browser is opened. Replacing a data item replaces the whole descriptor; provide its type and value again. Descriptions distinguish roles such as arrival/departure or billing/shipping address.
+
+The typed loop shares model, token, step and deadline budgets with navigation. Each iteration fills one field or runs one navigation step, then observes the same browser again. Model answers identify existing fields, data keys and option IDs. Only the applicable branch is consumed; low confidence on unrelated fields does not block navigation. Field-to-data and select-option choices below the prototype threshold of 0.7 hand off. The fill/navigation route only selects an execution path and does not authorize a write; filling still requires an accepted binding and the deterministic action guard. This threshold is not a universal accuracy guarantee.
+
+Explicit outcomes include `INPUT_MISSING`, `INPUT_AMBIGUOUS`, `DATE_FORMAT_UNKNOWN`, `INPUT_TYPE_MISMATCH`, `INPUT_WIDGET_UNSUPPORTED` and `INPUT_READBACK_FAILED`. Failed readback is never counted as an applied input. `typedInputs[].verification = "readback_at_fill"` records a past field check, not present business correctness. Literal typed values are omitted from the compact input report, but may occur in private page evidence and traces.

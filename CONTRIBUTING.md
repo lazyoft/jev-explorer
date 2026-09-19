@@ -2,6 +2,8 @@
 
 Use Node.js 24 or newer, install dependencies with `npm ci --ignore-scripts`, and install Chromium with `npx playwright install chromium`.
 
+Production source is TypeScript with strict checking; the JavaScript test harness exercises the compiled output. Build with `npm run build` before starting the MCP server.
+
 Run `npm run check` before submitting a pull request. Keep tests local and synthetic. The default suite must not require API keys or real accounts. Run the opt-in live test when changing real-provider handoff behavior, and state which verification was performed.
 
 Keep each operation readable from observation through action and outcome. Reuse the browser engine instead of introducing an application-specific DOM parser. Preserve session continuity, source provenance, compact reports and unknown-effect handling.

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
-import { BrowserExplorer } from '../src/explore-browser.mjs';
-import { createExplorerServer } from '../src/server.mjs';
+import { BrowserExplorer } from '../dist/explore-browser.js';
+import { createExplorerServer } from '../dist/server.js';
 import { localSite, temporaryRoot, scriptedEngine } from './fixtures.mjs';
 
 test('MCP exposes a goal, compact evidence, inspection and closure through the real protocol', async t => {

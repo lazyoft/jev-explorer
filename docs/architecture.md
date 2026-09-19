@@ -2,14 +2,16 @@
 
 The supervising agent delegates an objective. Jev Explorer owns the exploration session and returns concise evidence when it finishes a useful segment or needs intervention.
 
-The pinned browser engine handles DOM/ARIA observation, native Playwright effects, grounded selection, input binding and source extraction. This project adds the session lifecycle, cross-run memory, bounded handoff reports and MCP interface.
+The pinned browser engine handles DOM/ARIA observation, native Playwright effects, grounded selection, input binding and source extraction. This project adds the session lifecycle, cross-run memory, bounded handoff reports, typed-data adapters and MCP interface.
 
 | File | Responsibility |
 | --- | --- |
-| `src/explore-browser.mjs` | Open, explore, remember, resume, inspect, act and close |
-| `src/compact.mjs` | Bound the response while retaining essential provenance |
-| `src/server.mjs` | Six MCP tools and their validated input schemas |
-| `src/main.mjs` | Stdio transport and process lifecycle |
+| `src/explore-browser.ts` | Open, explore, remember, resume, inspect, act and close |
+| `src/compact.ts` | Bound the response while retaining essential provenance |
+| `src/server.ts` | Six MCP tools and their validated input schemas |
+| `src/typed-data.ts` | Validated data, batched semantic binding, deterministic formatting and field readback |
+| `src/types.ts` | Internal session, operation and result contracts |
+| `src/main.ts` | Stdio transport and process lifecycle |
 
 ## Three kinds of context
 
@@ -28,3 +30,11 @@ Stale observations can be retried in a bounded way without replaying actions. A 
 ## Evaluation
 
 Default tests exercise local browser behavior using controlled decisions. A separate live test uses real Jev calls and checks application records independently of the model. These tests establish specific properties; they do not establish a universal completion rate, comparative token savings, or correctness of an arbitrary business workflow.
+
+## Typed data execution
+
+The typed-data path alternates a fill opportunity with the pinned engine's one-step navigation. It uses the same decision wrapper for budgets, cancellation, tracing and objective memory. Jev selects fill/navigation and a datum for each field in parallel. Code consumes the first applicable field in document order, executes through an observed reference and checks its value and native validity. It recaptures the page before another effect; it does not reuse a batch of references after navigation.
+
+Dates retain a canonical calendar-day value without timezone conversion. Native controls use ISO; explicit text-field hints determine formatting. Unknown or conflicting hints hand off. Native selects use observed option identities, with a semantic decision for labels that differ from the supplied value. Unsupported custom widgets are explicit limitations, not successful fills.
+
+The adapter reads standard control metadata through uniquely identified accessible controls; native mutations still use the engine's captured references. Typed field effects use the same conservative authorization label check as engine actions. The default policy remains a heuristic, not a security boundary.

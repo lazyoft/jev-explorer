@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
-import { BrowserExplorer } from '../src/explore-browser.mjs';
+import { BrowserExplorer } from '../dist/explore-browser.js';
 import { JevBrowser, BrowserError } from '@tontoko/jev-browser';
 import { localSite, temporaryRoot, scriptedEngine } from './fixtures.mjs';
 

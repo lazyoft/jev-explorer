@@ -1,11 +1,17 @@
-export const short = (value, length = 240) => {
+import type { Session } from './types.js';
+export interface ReportExtras {
+  targets?: { ref: string; role: string; name: string; frame: number; filled?: boolean; checked?: boolean | 'mixed' }[];
+  targetCount?: number; targetsTruncated?: boolean; nextOffset?: number | null; image?: string;
+}
+export const short = (value: unknown, length = 240) => {
   const text = String(value ?? '');
   return text.length <= length ? text : text.slice(0, length - 1) + '…';
 };
 
-export function compactReport(session, { targets = false, offset = 0 } = {}) {
+export function compactReport(session: Session, { targets = false, offset = 0 } = {}) {
   const active = session.active;
-  const report = {
+  const base = {
+    compact: { truncated: false, fullEvidenceOnDisk: true },
     sessionId: session.id,
     status: session.status,
     reason: session.reason,
@@ -13,6 +19,7 @@ export function compactReport(session, { targets = false, offset = 0 } = {}) {
     pendingEffect: session.pendingEffect ?? false,
     objective: short(session.objective, 500),
     page: { url: short(session.view?.url, 400), title: short(session.view?.title, 140), observationTruncated: session.view?.truncated ?? false },
+    typedInputs: Object.values(session.typedApplied).slice(-12).map(({ key, field, format }) => ({ key, field: short(field, 140), format, verification: 'readback_at_fill' })),
     findings: session.facts.slice(-8).map(fact => ({
       key: fact.key,
       value: short(typeof fact.value === 'string' ? fact.value : JSON.stringify(fact.value), 240),
@@ -27,11 +34,12 @@ export function compactReport(session, { targets = false, offset = 0 } = {}) {
     sessionAlive: !session.closed,
     limitations: session.limitations.slice(-3).map(item => short(item, 180)),
   };
+  const report: typeof base & ReportExtras = base;
   if (targets) {
     report.targets = (session.view?.elements ?? []).slice(offset, offset + 35).map(element => ({ ref: element.id, role: element.role, name: short(element.name, 100), frame: element.frame, filled: element.filled, checked: element.checked }));
     report.targetCount = session.view?.elements?.length ?? 0;
-    report.targetsTruncated = offset + report.targets.length < report.targetCount;
-    report.nextOffset = report.targetsTruncated ? offset + report.targets.length : null;
+    report.targetsTruncated = offset + report.targets!.length < report.targetCount!;
+    report.nextOffset = report.targetsTruncated ? offset + report.targets!.length : null;
   }
   let truncated = session.facts.length > 8 || session.history.length > 6;
   while (JSON.stringify(report).length > (targets ? 12000 : 6500)) {
@@ -42,6 +50,6 @@ export function compactReport(session, { targets = false, offset = 0 } = {}) {
     else break;
   }
   report.compact = { truncated, fullEvidenceOnDisk: true };
-  if (targets) report.nextOffset = offset + report.targets.length < report.targetCount ? offset + report.targets.length : null;
+  if (targets) report.nextOffset = offset + report.targets!.length < report.targetCount! ? offset + report.targets!.length : null;
   return report;
 }
