@@ -1,0 +1,46 @@
+{
+  "name": "@lazyoft/jev-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node bin/jev-explorer.mjs",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "test:live": "node --test --test-concurrency=1 --test-timeout=120000 test/live.mjs",
+    "check": "node --check src/explore-browser.mjs && node --check src/server.mjs && node --check src/main.mjs && node --check src/compact.mjs && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@tontoko/jev-browser": "https://github.com/tontoko/jev-browser/releases/download/v0.5.0/tontoko-jev-browser-0.5.0.tgz",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "playwright": "1.63.0"
+  },
+  "description": "Goal-driven browser exploration with Jev, compact evidence, and persistent supervisor handoff over MCP.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lazyoft/jev-explorer.git"
+  },
+  "homepage": "https://github.com/lazyoft/jev-explorer#readme",
+  "bugs": {
+    "url": "https://github.com/lazyoft/jev-explorer/issues"
+  },
+  "bin": {
+    "jev-explorer": "bin/jev-explorer.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md"
+  ]
+}
