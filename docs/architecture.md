@@ -10,6 +10,8 @@ The pinned browser engine handles DOM/ARIA observation, native Playwright effect
 | `src/compact.ts` | Bound the response while retaining essential provenance |
 | `src/server.ts` | Six MCP tools and their validated input schemas |
 | `src/typed-data.ts` | Validated data, batched semantic binding, deterministic formatting and field readback |
+| `src/widgets.ts` | Owned autocomplete and calendar interaction, scoped observation and readback |
+| `src/input-choice.ts` | Validate offered choices and applicable confidence |
 | `src/types.ts` | Internal session, operation and result contracts |
 | `src/main.ts` | Stdio transport and process lifecycle |
 
@@ -33,8 +35,8 @@ Default tests exercise local browser behavior using controlled decisions. A sepa
 
 ## Typed data execution
 
-The typed-data path alternates a fill opportunity with the pinned engine's one-step navigation. It uses the same decision wrapper for budgets, cancellation, tracing and objective memory. Jev selects fill/navigation and a datum for each field in parallel. Code consumes the first applicable field in document order, executes through an observed reference and checks its value and native validity. It recaptures the page before another effect; it does not reuse a batch of references after navigation.
+The typed-data path alternates a fill opportunity with the pinned engine's one-step navigation. It uses the same decision wrapper for budgets, cancellation, tracing and objective memory. Jev selects the applicable supplied datum for each field in parallel, or marks the field irrelevant or ambiguous. Code consumes the first applicable field in document order, executes through an observed reference and checks its value and native validity. It recaptures the page before another effect; it does not reuse a batch of references after navigation.
 
-Dates retain a canonical calendar-day value without timezone conversion. Native controls use ISO; explicit text-field hints determine formatting. Unknown or conflicting hints hand off. Native selects use observed option identities, with a semantic decision for labels that differ from the supplied value. Unsupported custom widgets are explicit limitations, not successful fills.
+Dates retain a canonical calendar-day value without timezone conversion. Native controls use ISO; explicit text-field hints determine formatting. Unknown or conflicting hints hand off unless the control exposes a supported owned calendar popup. Native selects use observed option identities, with a semantic decision for labels that differ from the supplied value. Owned autocomplete and calendar adapters use scoped snapshots, semantic option choices and readback. Widgets lacking an ownership relationship or meaningful readback are explicit limitations, not successful fills.
 
-The adapter reads standard control metadata through uniquely identified accessible controls; native mutations still use the engine's captured references. Typed field effects use the same conservative authorization label check as engine actions. The default policy remains a heuristic, not a security boundary.
+The adapter reads standard control metadata through uniquely identified accessible controls; native mutations use the engine's captured references. For standard calendar grid cells omitted by the engine inventory, the adapter captures cells inside the owned popup, derives local selectors from that observed inventory, and revalidates their label, month/row context, visibility and enabled state before passing the selector to the engine. Model output never supplies selectors, and arbitrary selectors remain unavailable through the MCP tool contract. Typed field effects use the same conservative authorization label check as engine actions. The default policy remains a heuristic, not a security boundary.

@@ -4,9 +4,11 @@
 
 - Migrate production source to TypeScript with strict checking and compiled distribution.
 - Add typed text, date, number and boolean data to exploration and continuation.
-- Let Jev choose fill/navigation and field-to-data associations in one request.
+- Let Jev choose applicable field-to-data associations in one request.
 - Format native and explicitly labelled date fields without guessing locale.
-- Add semantic native-select option matching and observed field readback.
+- Add semantic native-select and owned-autocomplete option matching with field readback.
+- Add scoped custom calendar navigation, day selection and confirmation.
+- Count widget effects against the shared action budget and stop on ambiguous or unchanged state.
 - Preserve browser continuity and share budgets with typed input decisions.
 - Add synthetic multi-page browser tests and an opt-in live Jev test.
 

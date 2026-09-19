@@ -13,14 +13,13 @@ function typedEngine() {
   const mapping = { 'First name': 'given', 'Last name': 'family', Destination: 'city', Arrival: 'start', 'Arrival (DD/MM/YYYY)': 'start', Departure: 'end', Adults: 'party', 'Include breakfast': 'breakfast' };
   return { requests, async decide(request, options) {
     requests.push(request);
-    if (request.questions.typed_action) {
-      const answers = {}; let action = '__navigate__';
+    if (request.state.phase === 'typed-input') {
+      const answers = {};
       for (const [id, field] of Object.entries(request.state.fields)) {
         const data = Object.entries(request.state.data).find(([, data]) => data.key === mapping[field.name]);
         answers['datum_' + id] = { choice: data?.[0] ?? '__none__', confidence: data ? 0.99 : 0.3 };
-        if (data && action === '__navigate__') action = 'fill';
       }
-      answers.typed_action = { choice: action, confidence: 0.99 };
+
       return { answers };
     }
     if (request.questions.option) return { answers: { option: { choice: Object.entries(request.questions.option.criteria).find(([, item]) => item?.label === '2 adults')[0], confidence: 0.99 } } };
@@ -40,7 +39,7 @@ test('typed data crosses pages, formats dates and searches with independently ob
   assert.deepEqual(site.records, [{ first: 'Ada', last: 'Example', place: 'Harbor City', arrival: '2030-04-11', departure: '14/04/2030', adults: '2', breakfast: true }]);
   assert.equal(report.typedInputs.length, 7, JSON.stringify(report));
   assert.ok(report.typedInputs.some(input => input.key === 'end' && input.format === 'DD/MM/YYYY'));
-  const request = engine.requests.find(request => request.questions.typed_action);
+  const request = engine.requests.find(request => request.state.phase === 'typed-input');
   assert.ok(request.questions.datum_f0 && request.questions.datum_f1);
   assert.ok(!JSON.stringify(request).includes('Ada'));
 });
@@ -102,9 +101,10 @@ test('date formats preserve calendar days and reject ambiguous order', () => {
   assert.throws(() => formatDate('2030-04-11', 'text', 'DD/MM/YYYY or MM/DD/YYYY'), error => error.code === 'DATE_FORMAT_UNKNOWN');
 });
 
-test('uncertain selected datum stops before typing even when the route says fill', async t => {
+test('uncertain selected datum stops before typing despite other confident matches', async t => {
   const site = await typedSite(t); const base = typedEngine();
   const explorer = new BrowserExplorer({ root: await temporaryRoot(), engineFactory: () => ({ async decide(request, options) {
+    if (request.questions.confirm_binding) return { answers: { confirm_binding: { choice: 'ambiguous', confidence: 0.99 } } };
     const result = await base.decide(request, options);
     for (const [key, answer] of Object.entries(result.answers)) if (key.startsWith('datum_') && !answer.choice.startsWith('__')) answer.confidence = 0.4;
     return result;
@@ -128,4 +128,23 @@ test('typed decisions obey the model budget and replacement data updates the sam
   assert.equal(await page.getByLabel('Destination').inputValue(), 'Mountain Town');
   assert.equal(second.typedInputs.length, 1);
   assert.equal(site.records.length, 0);
+});
+
+
+test('an uncertain binding uses the candidate value for one explicit confirmation before typing', async t => {
+  const site = await typedSite(t); const base = typedEngine(); let confirmations = 0;
+  const explorer = new BrowserExplorer({ root: await temporaryRoot(), engineFactory: () => ({ async decide(request, options) {
+    if (request.questions.confirm_binding) {
+      confirmations++;
+      assert.equal(request.state.proposedDatum.value, 'Ada');
+      return { answers: { confirm_binding: { choice: 'confirmed', confidence: 0.98 } } };
+    }
+    const result = await base.decide(request, options);
+    for (const [key, answer] of Object.entries(result.answers)) if (key.startsWith('datum_') && answer.choice === 'd0') answer.confidence = 0.55;
+    return result;
+  } }) }); t.after(() => explorer.shutdown());
+  const report = await explorer.explore({ url: site.url + '/start', objective: 'Fill the guest first name.', data: { given: tripData.given }, maxSteps: 1 });
+  assert.equal(confirmations, 1);
+  assert.equal(await explorer.get(report.sessionId).core.page.getByLabel('First name', { exact: true }).inputValue(), 'Ada');
+  assert.equal(report.typedInputs.length, 1);
 });

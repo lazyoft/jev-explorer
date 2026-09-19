@@ -116,7 +116,7 @@ Input values come from the caller or observed sources. Jev chooses controls and 
 
 ## Typed input data
 
-Supply known data separately from the objective. Jev chooses whether to fill and which datum belongs in each observed field. The server copies the selected value, formats dates, executes through a current browser reference, and checks the value and field validity afterwards.
+Supply known data separately from the objective. Jev chooses which supplied datum, if any, should be applied to each observed field. The server copies the selected value, formats dates, executes through a current browser reference, and checks the value and field validity afterwards.
 
 ```json
 {
@@ -133,9 +133,9 @@ Supply known data separately from the objective. Jev chooses whether to fill and
 
 Use `data` or legacy `values` in an exploration, not both. `jev_continue` accepts additional or replacement `data` items. A verified field is checked again when it remains visible; changing its supplied datum or its displayed value makes it eligible for filling again. Data is available to the workflow, not a requirement to fill every item on every page.
 
-The first adapters support text inputs, native date inputs, text dates with an explicit format, number inputs, checkboxes and single native selects. Date values must be real calendar dates in `YYYY-MM-DD` form. For text controls, supported visible hints are `DD/MM/YYYY`, `MM/DD/YYYY`, `DD.MM.YYYY`, `DD-MM-YYYY`, `YYYY/MM/DD` and `YYYY-MM-DD`, including Italian `gg/mm/aaaa`. No day/month order is guessed. Custom calendars, split date controls and custom autocomplete selection are not implemented by this adapter and can require handoff.
+The first adapters support text inputs, native date inputs, text dates with an explicit format, number inputs, checkboxes and single native selects. Date values must be real calendar dates in `YYYY-MM-DD` form. For text controls, supported visible hints are `DD/MM/YYYY`, `MM/DD/YYYY`, `DD.MM.YYYY`, `DD-MM-YYYY`, `YYYY/MM/DD` and `YYYY-MM-DD`, including Italian `gg/mm/aaaa`. No day/month order is guessed. Accessible autocomplete lists and custom calendars are also supported when the field identifies its popup with `aria-controls` or `aria-owns`. Autocomplete chooses among observed suggestions instead of requiring an exact label match. Calendars can navigate month/year controls, select a day and confirm it. Both require a valid field readback. Combined date ranges, split date controls, visual-only calendars and widgets without an identifiable owned popup can still require handoff.
 
-Field/data associations and the fill/navigation decision are requested together. Native select options are chosen in a further grounded decision using the supplied value. Model selection cannot manufacture a new value. `typedInputs` reports which datum was read back in which field; it does not certify a reservation, a saved record, or continued correctness after a later page transition.
+Field/data associations are requested together. The code applies the first relevant association; if none applies, the browser engine continues navigation. Native select options are chosen in a further grounded decision using the supplied value. Model selection cannot manufacture a new value. `typedInputs` reports which datum was read back in which field; it does not certify a reservation, a saved record, or continued correctness after a later page transition.
 
 ## Tools
 
@@ -191,9 +191,12 @@ For opt-in tests with actual Jev calls:
 ```sh
 npm run test:live
 npm run test:live:typed
+npm run test:live:widgets
 ```
 
 This makes paid API calls using synthetic local data. It does not run in CI or use real accounts. Local results are not a benchmark of arbitrary websites.
+
+An additional opt-in `npm run test:live:public-widgets` exercises the W3C WAI public examples with synthetic data. It depends on those external pages and is excluded from CI. The custom calendar example has passed; the public State autocomplete currently hands off on binding confidence before typing, so that probe remains a failing compatibility reproduction. The synthetic end-to-end autocomplete/calendar flow passes with real Jev.
 
 [Contributing](CONTRIBUTING.md) · [Architecture](docs/architecture.md) · [Changelog](CHANGELOG.md)
 

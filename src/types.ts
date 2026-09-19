@@ -6,7 +6,7 @@ export interface Fact { key: string; value: string; url?: string; origin: 'obser
 export interface History { action: string; outcome: string; source: 'browser-action' | 'supervisor' | 'runtime' | 'typed-input' }
 export interface Settings { maxSteps: number; maxCalls: number; maxTokens: number; timeoutMs: number }
 export interface ActiveRun extends Settings {
-  calls: number; failedCalls: number; inputTokens: number; outputTokens: number; elapsedMs: number; observationRetries: number;
+  browserActions: number; calls: number; failedCalls: number; inputTokens: number; outputTokens: number; elapsedMs: number; observationRetries: number;
   observations: { url?: unknown; changed: boolean; previousAction?: string }[];
   repetitions: Map<string, number>; lastFingerprint?: string; lastAction?: string;
 }

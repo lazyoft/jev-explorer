@@ -269,7 +269,7 @@ export class BrowserExplorer {
 
   async execute(session: Session, signal?: AbortSignal) {
     const started = performance.now();
-    session.active = { ...session.settings, calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, elapsedMs: 0, observationRetries: 0, observations: [], repetitions: new Map() };
+    session.active = { ...session.settings, browserActions: 0, calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, elapsedMs: 0, observationRetries: 0, observations: [], repetitions: new Map() };
     session.status = 'running'; session.reason = 'exploring'; session.needs = []; session.workflow = undefined;
     const deadline = Date.now() + session.settings.timeoutMs;
     const runSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(session.settings.timeoutMs)]) : AbortSignal.timeout(session.settings.timeoutMs);
@@ -346,18 +346,29 @@ export class BrowserExplorer {
     const engine = this.wrapEngine(session, { decide: (...args) => (session.provider ??= this.engineFactory(session)).decide(...args) });
     const combined: RunResult = { status: 'stopped', reason: 'step-limit', steps: [], effects: [] };
     try {
-      for (let step = 0; step < session.settings.maxSteps; step++) {
+      let steps = session.active!.browserActions;
+      while (steps < session.settings.maxSteps) {
         signal.throwIfAborted();
         await this.capture(session);
         const operation = { signal, timeoutMs: Math.max(1, deadline - Date.now()) };
+        const beforeSteps = steps;
         const filled = await fillTypedData({ core: session.core, snapshot: session.view, data: session.data, applied: session.typedApplied, objective: instructions, engine, operation, authorize: element => session.allowCommit || !(noWriteWords.test(element.name) || element.inputType === 'submit'),
+          act: async (command, target) => {
+            signal.throwIfAborted();
+            if (steps >= session.settings.maxSteps) throw new BrowserError('INPUT_STEP_LIMIT', 'The typed interaction exhausted the browser action budget.');
+            if (!session.allowCommit && (noWriteWords.test(target.name) || target.inputType === 'submit')) throw new BrowserError('ACTION_DENIED', 'This exploration did not authorize the selected widget effect.');
+            steps++; session.active!.browserActions = steps;
+            await session.core.native(command, { signal, timeoutMs: Math.max(1, deadline - Date.now()) });
+            await this.event(session, { kind: 'typed-action', command: command.command, target: target.name });
+          },
           record: async entry => {
             session.history.push({ action: `fill ${entry.field} from data.${entry.key}${entry.format ? ' as ' + entry.format : ''}`, outcome: entry.outcome, source: 'typed-input' });
             await this.event(session, { kind: 'typed-input', ...entry });
           },
         });
-        if (filled.filled) continue;
+        if (filled.filled) { if (steps === beforeSteps) steps++; session.active!.browserActions = steps; continue; }
         const next = await session.core.run(instructions + '\nTyped data filling is handled separately. Continue navigation or finish if the objective is met. Do not invent or type additional values.', { maxSteps: 1, maxDecisions: session.settings.maxCalls, decisionRetries: 0, ...operation });
+        steps += Math.max(1, next.steps.length); session.active!.browserActions = steps;
         combined.steps.push(...next.steps);
         combined.effects!.push(...next.effects ?? []);
         combined.status = next.status;
