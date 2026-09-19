@@ -1,4 +1,5 @@
 import type { BrowserLaunchOptions, DecisionEngine, JevBrowser, RunResult, RunValue, Snapshot, TextEvidence } from '@tontoko/jev-browser';
+import type { PageStateMemory } from './page-state.js';
 import type { TypedData, AppliedDatum } from './typed-data.js';
 
 export type Values = Record<string, RunValue>;
@@ -6,7 +7,7 @@ export interface Fact { key: string; value: string; url?: string; origin: 'obser
 export interface History { action: string; outcome: string; source: 'browser-action' | 'supervisor' | 'runtime' | 'typed-input' }
 export interface Settings { maxSteps: number; maxCalls: number; maxTokens: number; timeoutMs: number }
 export interface ActiveRun extends Settings {
-  browserActions: number; calls: number; failedCalls: number; inputTokens: number; outputTokens: number; elapsedMs: number; observationRetries: number;
+  pageState: PageStateMemory; browserActions: number; calls: number; failedCalls: number; inputTokens: number; outputTokens: number; elapsedMs: number; observationRetries: number;
   observations: { url?: unknown; changed: boolean; previousAction?: string }[];
   repetitions: Map<string, number>; lastFingerprint?: string; lastAction?: string;
 }

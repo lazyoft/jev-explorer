@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Add generic page readiness handling for loading, optional overlays, usable task dialogs and blocked states.
+- Verify dismissal effects before continuing and retain conservative action guards.
+- Diagnose typed navigation with no next action without treating it as completion.
+- Add synthetic stacked-dialog, delayed-loading, no-op-dismissal and security-challenge tests plus a real-Jev readiness test.
+
 ## 0.2.0
 
 - Migrate production source to TypeScript with strict checking and compiled distribution.

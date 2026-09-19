@@ -22,7 +22,7 @@ const native = z.discriminatedUnion('command', [
 ]);
 
 export function createExplorerServer(explorer: BrowserExplorer) {
-  const server = new McpServer({ name: 'jev-explorer', version: '0.2.0' });
+  const server = new McpServer({ name: 'jev-explorer', version: '0.3.0' });
   const add = <S extends z.ZodObject>(name: string, description: string, inputSchema: S, work: (args: z.output<S>, signal?: AbortSignal) => Promise<unknown>, readOnly = false) => server.registerTool(name, {
     description, inputSchema: inputSchema as z.ZodObject,
     annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, openWorldHint: true },

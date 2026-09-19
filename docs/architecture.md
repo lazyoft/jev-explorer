@@ -9,6 +9,7 @@ The pinned browser engine handles DOM/ARIA observation, native Playwright effect
 | `src/explore-browser.ts` | Open, explore, remember, resume, inspect, act and close |
 | `src/compact.ts` | Bound the response while retaining essential provenance |
 | `src/server.ts` | Six MCP tools and their validated input schemas |
+| `src/page-state.ts` | Bounded readiness waits, semantic obstacle classification and verified optional dismissals |
 | `src/typed-data.ts` | Validated data, batched semantic binding, deterministic formatting and field readback |
 | `src/widgets.ts` | Owned autocomplete and calendar interaction, scoped observation and readback |
 | `src/input-choice.ts` | Validate offered choices and applicable confidence |
@@ -40,3 +41,5 @@ The typed-data path alternates a fill opportunity with the pinned engine's one-s
 Dates retain a canonical calendar-day value without timezone conversion. Native controls use ISO; explicit text-field hints determine formatting. Unknown or conflicting hints hand off unless the control exposes a supported owned calendar popup. Native selects use observed option identities, with a semantic decision for labels that differ from the supplied value. Owned autocomplete and calendar adapters use scoped snapshots, semantic option choices and readback. Widgets lacking an ownership relationship or meaningful readback are explicit limitations, not successful fills.
 
 The adapter reads standard control metadata through uniquely identified accessible controls; native mutations use the engine's captured references. For standard calendar grid cells omitted by the engine inventory, the adapter captures cells inside the owned popup, derives local selectors from that observed inventory, and revalidates their label, month/row context, visibility and enabled state before passing the selector to the engine. Model output never supplies selectors, and arbitrary selectors remain unavailable through the MCP tool contract. Typed field effects use the same conservative authorization label check as engine actions. The default policy remains a heuristic, not a security boundary.
+
+The readiness phase uses semantic dialog roles, scoped snapshots, observed controls and pointer hit-testing rather than site-specific selectors. Read-only observations interrupted by navigation become bounded stale-observation retries. It keeps the original obstruction handle across the dismissal to verify disappearance. One bounded post-`no-match` diagnosis distinguishes missing data, a transient state, an obstruction and an actual result. Legacy engine runs receive the initial readiness phase; typed runs repeat it between operations.

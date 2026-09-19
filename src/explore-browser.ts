@@ -4,11 +4,12 @@ import { resolve, join } from 'node:path';
 import { JevBrowser, JevDecisionEngine, BrowserError } from '@tontoko/jev-browser';
 import { z } from 'zod';
 import { compactReport, short } from './compact.js';
-import type { BrowserLaunchOptions, DecisionEngine, DecisionRequest, GroundedAction, NativeCommand, RunResult, RunValue } from '@tontoko/jev-browser';
+import type { BrowserLaunchOptions, DecisionEngine, DecisionRequest, GroundedAction, ElementInfo, NativeCommand, RunResult, RunValue } from '@tontoko/jev-browser';
 import type { Page } from 'playwright';
 import type { Session, ExplorerOptions, ExploreArgs, ContinueArgs, Operation, Values } from './types.js';
 import { asError, record } from './types.js';
 import { dataSchema, fillTypedData } from './typed-data.js';
+import { pageState } from './page-state.js';
 
 const flatten = (value: Values, path = ''): [string, RunValue][] => Object.entries(value ?? {}).flatMap(([key, item]) => {
   const next = path + '/' + key.replaceAll('~', '~0').replaceAll('/', '~1');
@@ -269,18 +270,17 @@ export class BrowserExplorer {
 
   async execute(session: Session, signal?: AbortSignal) {
     const started = performance.now();
-    session.active = { ...session.settings, browserActions: 0, calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, elapsedMs: 0, observationRetries: 0, observations: [], repetitions: new Map() };
+    session.active = { ...session.settings, pageState: { waits: 0, noMatchChecked: false }, browserActions: 0, calls: 0, failedCalls: 0, inputTokens: 0, outputTokens: 0, elapsedMs: 0, observationRetries: 0, observations: [], repetitions: new Map() };
     session.status = 'running'; session.reason = 'exploring'; session.needs = []; session.workflow = undefined;
     const deadline = Date.now() + session.settings.timeoutMs;
     const runSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(session.settings.timeoutMs)]) : AbortSignal.timeout(session.settings.timeoutMs);
     let result: RunResult | undefined;
     try {
       await this.capture(session);
-      const currentValues = await this.remainingValues(session);
       const instructions = session.objective + '\nThis is browser exploration. If information or a required value is missing, stop and retain the current page. Do not invent values. Prior applied inputs and supervised discoveries are supplied in explorationMemory. Do not restart or repeat completed effects. ' + (session.allowCommit ? 'Only perform submission effects explicitly requested by this objective.' : 'Do not save, send, purchase, delete or submit business records. Read-only navigation, search and editing filters are allowed. Submitting a search/filter request solely to retrieve results is an advance/navigation action, not a business-record commit.');
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          result = Object.keys(session.data).length ? await this.runTyped(session, instructions, runSignal, deadline) : await session.core.run(instructions, { values: currentValues, maxSteps: session.settings.maxSteps, maxDecisions: session.settings.maxCalls, timeoutMs: Math.max(1, deadline - Date.now()), decisionRetries: 0, signal: runSignal });
+          result = await this.runFlow(session, instructions, runSignal, deadline);
           this.rememberResult(session, result);
           break;
         } catch (caught) { const error = asError(caught);
@@ -342,7 +342,7 @@ export class BrowserExplorer {
     return compactReport(session);
   }
 
-  async runTyped(session: Session, instructions: string, signal: AbortSignal, deadline: number): Promise<RunResult> {
+  async runFlow(session: Session, instructions: string, signal: AbortSignal, deadline: number): Promise<RunResult> {
     const engine = this.wrapEngine(session, { decide: (...args) => (session.provider ??= this.engineFactory(session)).decide(...args) });
     const combined: RunResult = { status: 'stopped', reason: 'step-limit', steps: [], effects: [] };
     try {
@@ -352,15 +352,22 @@ export class BrowserExplorer {
         await this.capture(session);
         const operation = { signal, timeoutMs: Math.max(1, deadline - Date.now()) };
         const beforeSteps = steps;
-        const filled = await fillTypedData({ core: session.core, snapshot: session.view, data: session.data, applied: session.typedApplied, objective: instructions, engine, operation, authorize: element => session.allowCommit || !(noWriteWords.test(element.name) || element.inputType === 'submit'),
-          act: async (command, target) => {
-            signal.throwIfAborted();
-            if (steps >= session.settings.maxSteps) throw new BrowserError('INPUT_STEP_LIMIT', 'The typed interaction exhausted the browser action budget.');
-            if (!session.allowCommit && (noWriteWords.test(target.name) || target.inputType === 'submit')) throw new BrowserError('ACTION_DENIED', 'This exploration did not authorize the selected widget effect.');
-            steps++; session.active!.browserActions = steps;
-            await session.core.native(command, { signal, timeoutMs: Math.max(1, deadline - Date.now()) });
-            await this.event(session, { kind: 'typed-action', command: command.command, target: target.name });
-          },
+        const act = async (command: NativeCommand, target: ElementInfo) => {
+          signal.throwIfAborted();
+          if (steps >= session.settings.maxSteps) throw new BrowserError('INPUT_STEP_LIMIT', 'The typed interaction exhausted the browser action budget.');
+          if (!session.allowCommit && (noWriteWords.test(target.name) || target.inputType === 'submit')) throw new BrowserError('ACTION_DENIED', 'This exploration did not authorize the selected widget effect.');
+          steps++; session.active!.browserActions = steps;
+          await session.core.native(command, { signal, timeoutMs: Math.max(1, deadline - Date.now()) });
+          await this.event(session, { kind: 'typed-action', command: command.command, target: target.name });
+        };
+        const readiness = await pageState({ core: session.core, snapshot: session.view, objective: instructions, suppliedKeys: Object.keys(session.data).length ? Object.keys(session.data) : flatten(session.values).map(([key]) => key), memory: session.active!.pageState, engine, operation, afterNoMatch: session.active!.pageState.noMatchChecked, act,
+          record: async (action, outcome) => { session.history.push({ action, outcome, source: 'runtime' }); await this.event(session, { kind: 'page-state', action, outcome }); },
+        });
+        if (readiness === 'reobserve') { session.active!.pageState.noMatchChecked = false; continue; }
+        if (readiness === 'complete') { combined.status = 'unverified'; combined.reason = 'model-complete'; return combined; }
+        if (session.active!.pageState.noMatchChecked) throw new BrowserError('NO_GROUNDED_ACTION', 'The page is ready but no grounded action advances the objective.');
+        if (!Object.keys(session.data).length) return session.core.run(instructions, { values: await this.remainingValues(session), maxSteps: session.settings.maxSteps - steps, maxDecisions: session.settings.maxCalls, decisionRetries: 0, ...operation });
+        const filled = await fillTypedData({ core: session.core, snapshot: session.view, data: session.data, applied: session.typedApplied, objective: instructions, engine, operation, authorize: element => session.allowCommit || !(noWriteWords.test(element.name) || element.inputType === 'submit'), act,
           record: async entry => {
             session.history.push({ action: `fill ${entry.field} from data.${entry.key}${entry.format ? ' as ' + entry.format : ''}`, outcome: entry.outcome, source: 'typed-input' });
             await this.event(session, { kind: 'typed-input', ...entry });
@@ -374,13 +381,14 @@ export class BrowserExplorer {
         combined.status = next.status;
         combined.reason = next.reason;
         combined.verification = next.verification;
+        if (next.reason === 'no-match' && !next.effects?.some(effect => effect.kind === 'commit')) { session.active!.pageState.noMatchChecked = true; continue; }
         if (next.reason !== 'step-limit' || next.effects?.some(effect => effect.kind === 'commit')) return combined;
       }
       combined.status = 'stopped'; combined.reason = 'step-limit';
       return combined;
     } catch (caught) {
       const error = asError(caught);
-      error.partial = { ...combined, ...error.partial, steps: [...combined.steps, ...error.partial?.steps ?? []], effects: [...combined.effects ?? [], ...error.partial?.effects ?? []] };
+      error.partial = { ...combined, status: 'stopped', reason: 'error', ...error.partial, steps: [...combined.steps, ...error.partial?.steps ?? []], effects: [...combined.effects ?? [], ...error.partial?.effects ?? []] };
       throw error;
     }
   }

@@ -12,6 +12,7 @@ Jev Explorer is an MCP server for agents that should spend less context on routi
 - Keeps the browser alive across missing-input handoffs and supervisor interventions.
 - Remembers findings, prior actions, observed outcomes, and supplied facts separately.
 - Returns a compact report instead of automatically sending the full DOM and trace to the supervising agent.
+- Waits for loading, dismisses optional obstructions, and verifies their disappearance before continuing.
 - Stops on budgets, repeated actions without progress, validation problems, and uncertain submission outcomes.
 - Lets the supervisor inspect, act, continue, or close the same session.
 
@@ -192,6 +193,7 @@ For opt-in tests with actual Jev calls:
 npm run test:live
 npm run test:live:typed
 npm run test:live:widgets
+npm run test:live:page-state
 ```
 
 This makes paid API calls using synthetic local data. It does not run in CI or use real accounts. Local results are not a benchmark of arbitrary websites.

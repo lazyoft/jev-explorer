@@ -1,6 +1,6 @@
 {
   "name": "@lazyoft/jev-explorer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,7 +15,8 @@
     "prepack": "npm run build",
     "test:live:typed": "node --env-file-if-exists=.env --test --test-timeout=120000 test/typed-live.mjs",
     "test:live:widgets": "node --env-file-if-exists=.env --test --test-timeout=120000 test/widget-live.mjs",
-    "test:live:public-widgets": "node --env-file-if-exists=.env --test --test-concurrency=1 --test-timeout=120000 test/widget-public-live.mjs"
+    "test:live:public-widgets": "node --env-file-if-exists=.env --test --test-concurrency=1 --test-timeout=120000 test/widget-public-live.mjs",
+    "test:live:page-state": "node --env-file-if-exists=.env --test --test-timeout=120000 test/page-state-live.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
