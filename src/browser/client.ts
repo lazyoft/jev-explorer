@@ -10,7 +10,7 @@ const ACTION_TIMEOUT = 5000;
 
 export async function launchBrowser(headed: boolean): Promise<{ browser: Browser; context: BrowserContext; page: Page }> {
   const browser = await chromium.launch({ headless: !headed });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: process.env.JEV_LOCALE ?? 'en-US' });
   context.setDefaultTimeout(ACTION_TIMEOUT);
   const page = await context.newPage();
   page.on('dialog', dialog => void dialog.dismiss().catch(() => {}));

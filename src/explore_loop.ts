@@ -2,7 +2,7 @@ import { perform, readBack, readObservation, settle } from './browser/client.js'
 import { buildRequest, type Ask, type Answer, type Decider } from './jev/client.js';
 import { sliceItems } from './jev/slices.js';
 import { askAnswers, askBindings, askEffect, askNextAction, navigableActions, selectableFields, NEXT_SLICE, NONE, NOTHING, NOT_HERE, PREVIOUS_SLICE } from './jev/questions.js';
-import { blocked, needsDecision, needsValue, spent } from './domain/errors.js';
+import { ExplorerError, needsDecision, needsValue, spent } from './domain/errors.js';
 import { trace, saveObservation } from './domain/trace.js';
 import type { Action, Effect, Session } from './domain/types.js';
 
@@ -26,6 +26,8 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   const started = Date.now();
   const deadline = started + session.budgets.timeoutMs;
   let lastMark = '';
+  let staleRetries = 0;
+  const unhelpful = new Set<string>();
 
   const ask = async (asks: Record<string, Ask>): Promise<Record<string, Answer>> => {
     if (session.usage.messages >= session.budgets.maxMessages) {
@@ -41,11 +43,12 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   };
 
   const read = async () => {
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       signal.throwIfAborted();
       session.observation = await readObservation(session.page);
-      if (!session.observation.busy && (session.observation.actions.length || session.observation.texts.length)) break;
-      await settle(session.page, 500);
+      const fromPage = session.observation.actions.filter(action => action.ref.includes(':')).length + session.observation.texts.filter(text => text.ref !== 'title').length;
+      if (!session.observation.busy && fromPage > 0) break;
+      await settle(session.page, 800);
     }
     await saveObservation(session);
   };
@@ -80,9 +83,12 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
     return false;
   };
 
+  const markOf = (action: Action) => session.observation.url + '|' + action.ref + '|' + action.name;
+
   const chooseAction = async (): Promise<Action | null> => {
     const bothPagingChoices = { number: 2, count: 3, allSeen: false };
-    const slices = sliceItems(navigableActions(session.observation), group => ({ action: askNextAction(session, group, bothPagingChoices) }));
+    const offered = navigableActions(session.observation).filter(action => !unhelpful.has(markOf(action)));
+    const slices = sliceItems(offered, group => ({ action: askNextAction(session, group, bothPagingChoices) }));
     const seen = new Set<number>();
     let index = 0;
     for (;;) {
@@ -144,8 +150,13 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
         return;
       }
 
-      const mark = session.observation.url + '|' + action.ref + '|' + action.name;
-      if (mark === lastMark) throw blocked('REPEATED_STEP', 'The same step was chosen twice and the page did not change. Look at the page.');
+      const mark = markOf(action);
+      if (mark === lastMark && action.kind !== 'scroll') {
+        unhelpful.add(mark);
+        lastMark = '';
+        session.steps.push({ action: `${action.kind} "${action.name}"`, effect: 'move', outcome: 'chosen twice with no change; not offered again' });
+        continue;
+      }
       lastMark = mark;
 
       let effect: Effect = 'move';
@@ -159,7 +170,15 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
         throw needsDecision('COMMIT_NOT_ALLOWED', `The next step ${label} acts outside the page. Allow it, or take over.`);
       }
 
-      await perform(session.page, action);
+      try {
+        await perform(session.page, action);
+      } catch (error) {
+        if (!(error instanceof ExplorerError) || error.code !== 'STALE_CONTROL' || ++staleRetries > 3) throw error;
+        await trace(session, { kind: 'stale', action: label });
+        lastMark = '';
+        await settle(session.page, 800);
+        continue;
+      }
       await settle(session.page, 800);
       session.usage.steps++;
       await trace(session, { kind: 'acted', action: label, effect });

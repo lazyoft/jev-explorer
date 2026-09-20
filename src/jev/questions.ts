@@ -34,7 +34,7 @@ export function askNextAction(session: Session, actions: Action[], slice?: { num
       valuesInHand: Object.keys(session.values),
       ...(slice ? { partOfPage: { number: slice.number, of: slice.count, wholePageSeen: slice.allSeen } } : {}),
     },
-    question: 'Which one of these options moves toward the goal? Use what was already done, so the same step is not repeated. A missing option in this list is not proof that the website lacks it.',
+    question: 'Which one of these options moves toward the goal? Closing a pop-up, a banner or a cookie notice that covers the page also counts, because the page cannot be used until it is gone. Refuse what is optional rather than accept it, and never sign in or accept terms to get past it. Use what was already done, so the same step is not repeated. A missing option in this list is not proof that the website lacks it.',
     choices,
   };
 }

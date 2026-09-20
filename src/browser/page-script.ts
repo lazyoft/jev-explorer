@@ -152,6 +152,6 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     title: document.title,
     busy: document.readyState !== 'complete' || !!document.querySelector('[aria-busy="true"], [role="progressbar"]'),
     actions, texts,
-    scrollable: document.documentElement.scrollHeight > window.innerHeight + 40,
+    scrollable: window.scrollY + window.innerHeight < document.documentElement.scrollHeight - 40,
   };
 }

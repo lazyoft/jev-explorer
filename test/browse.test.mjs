@@ -99,7 +99,7 @@ test('a required field with no value asks the caller for it', async () => {
   } finally { await site.stop(); }
 });
 
-test('it stops when the same step repeats with no change', async () => {
+test('it stops offering a step that changed nothing', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
     if (id === 'action') return pick(ask, holds('Accept all cookies')) ?? '__nothing__';
@@ -108,8 +108,8 @@ test('it stops when the same step repeats with no change', async () => {
   });
   try {
     const report = await run(decider, { url: site.url, goal: 'Do the same thing forever.' });
-    assert.equal(report.status, 'blocked');
-    assert.match(report.need, /twice/);
+    assert.equal(report.status, 'needs_decision');
+    assert.ok(report.lastSteps.some(step => step.outcome.includes('not offered again')));
   } finally { await site.stop(); }
 });
 
