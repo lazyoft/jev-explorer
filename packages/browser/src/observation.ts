@@ -1,4 +1,4 @@
-// Modified by lazyoft: retain and refresh private pointer hit-test results for execution.
+// Modified by lazyoft: pointer metadata and batched transfer of complete DOM observations.
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { ElementHandle, JSHandle, Page, Frame } from 'playwright';
@@ -20,7 +20,7 @@ export interface Captured {
   changeKeys: Record<number, string>;
   dispose(): Promise<void>;
 }
-export async function capture(page: Page, options: { scope?: string; recordsScope?: string; maxElements: number; maxTexts: number; selection?: {frame:Frame;roots:ElementHandle<Element>[]} }): Promise<Captured> {
+export async function capture(page: Page, options: { scope?: string; recordsScope?: string; maxElements: number; maxTexts: number; complete?: boolean; signal?: AbortSignal; selection?: {frame:Frame;roots:ElementHandle<Element>[]} }): Promise<Captured> {
   const refs = new Map<string, ElementRef>();
   const changeKeys: Record<number,string> = {};
   const owned: JSHandle[] = [];
@@ -33,9 +33,10 @@ export async function capture(page: Page, options: { scope?: string; recordsScop
   };
   try {
     for (const [frameIndex, frame] of page.frames().entries()) {
+      options.signal?.throwIfAborted();
       if(options.selection && options.selection.frame !== frame)continue;
-      const {selection,...ordinaryOptions}=options;
-      const frameOptions = { ...ordinaryOptions, maxElements: Math.max(0, options.maxElements - data.elements.length), maxTexts: Math.max(0, options.maxTexts - data.texts.length) };
+      const {selection,signal,...ordinaryOptions}=options;
+      const frameOptions = { ...ordinaryOptions, maxElements: options.complete ? options.maxElements : Math.max(0, options.maxElements - data.elements.length), maxTexts: options.complete ? options.maxTexts : Math.max(0, options.maxTexts - data.texts.length) };
       // Use Playwright's native CSS resolver, including open shadow roots.
       const roots = options.selection?.roots ?? (options.scope ? (await frame.locator(`css=${options.scope}`).elementHandles()) as ElementHandle<Element>[] : undefined);
       if (roots && !options.selection) owned.push(...roots);
@@ -44,22 +45,31 @@ export async function capture(page: Page, options: { scope?: string; recordsScop
       const observe = new Function('args', `${source()}; return JevDOM.observe(${JSON.stringify(frameOptions)}, args.roots, args.recordRoots);`) as (args: { roots?: Element[]; recordRoots?: Element[] }) => ReturnType<typeof DOM.observe>;
       const result = await frame.evaluateHandle(observe, { roots, recordRoots });
       owned.push(result);
-      const observed = await result.evaluate(r => ({ elements: r.elements, texts: r.texts, records: r.records, recordInventoryComplete:r.recordInventoryComplete, busy: r.busy, changeKey: r.changeKey, truncatedElements: r.truncatedElements, truncatedTexts: r.truncatedTexts }));
+      const observed = await result.evaluate(r => ({ elementCount:r.elements.length, textCount:r.texts.length, records:r.records, recordInventoryComplete:r.recordInventoryComplete, busy:r.busy, changeKey:r.changeKey, truncatedElements:r.truncatedElements, truncatedTexts:r.truncatedTexts }));
       changeKeys[frameIndex] = observed.changeKey;
       data.busy ||= observed.busy;
-      const nodes = await result.getProperty('nodes'); owned.push(nodes);
-      const properties = await nodes.getProperties();
-      for (const [index, handle] of properties) {
-        owned.push(handle);
-        const description = observed.elements[Number(index)];
-        const element = handle.asElement();
-        if (!element || !description) continue;
-        const id = `r${data.id.replaceAll('-', '').slice(0, 12)}_e${frameIndex}_${index}`;
-        const info = { ...description.info, ...(description.info.formId ? { formId: `${frameIndex}:${description.info.formId}` } : {}), id, frame: frameIndex };
-        data.elements.push(info);
-        refs.set(id, { frame, handle: element as ElementHandle<Element>, signature: description.signature, info, pointerPosition: description.pointerPosition ?? undefined, pointerBlocked: description.pointerPosition === null });
+      const elementBatch = Math.max(1, options.maxElements), textBatch = Math.max(1, options.maxTexts);
+      for (let start = 0; start < observed.elementCount; start += elementBatch) {
+        options.signal?.throwIfAborted();
+        const descriptions = await result.evaluate((r, range) => r.elements.slice(range.start, range.end), {start,end:start+elementBatch});
+        const nodes = await result.evaluateHandle((r, range) => r.nodes.slice(range.start, range.end), {start,end:start+elementBatch}); owned.push(nodes);
+        const properties = await nodes.getProperties();
+        for (const [index, handle] of properties) {
+          owned.push(handle);
+          const description = descriptions[Number(index)];
+          const element = handle.asElement();
+          if (!element || !description) continue;
+          const id = `r${data.id.replaceAll('-', '').slice(0, 12)}_e${frameIndex}_${start+Number(index)}`;
+          const info = { ...description.info, ...(description.info.formId ? { formId: `${frameIndex}:${description.info.formId}` } : {}), id, frame: frameIndex };
+          data.elements.push(info);
+          refs.set(id, { frame, handle: element as ElementHandle<Element>, signature: description.signature, info, pointerPosition: description.pointerPosition ?? undefined, pointerBlocked: description.pointerPosition === null });
+        }
       }
-      data.texts.push(...observed.texts.map((text, i) => ({ ...text, id: `t${frameIndex}_${i}`, frame: frameIndex })));
+      for (let start = 0; start < observed.textCount; start += textBatch) {
+        options.signal?.throwIfAborted();
+        const texts = await result.evaluate((r, range) => r.texts.slice(range.start, range.end), {start,end:start+textBatch});
+        data.texts.push(...texts.map((text, i) => ({...text,id:`t${frameIndex}_${start+i}`,frame:frameIndex})));
+      }
       data.records!.push(...observed.records.map(r => ({ id: `record${frameIndex}_${r.index}`, frame: frameIndex, context: r.context, readOnly: r.readOnly, textIds: r.texts.map(i => `t${frameIndex}_${i}`), ...(r.parent !== undefined ? { parentId: `record${frameIndex}_${r.parent}` } : {}) })));
       data.recordInventoryComplete &&= observed.recordInventoryComplete;
       data.truncatedElements ||= observed.truncatedElements;

@@ -1,3 +1,4 @@
+// Modified by lazyoft: verify scope isolation when complete acquisition is paginated.
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {fixtureBrowser} from './helpers.mjs';
@@ -35,7 +36,9 @@ test('regions: a preexisting result outside the input scope does not falsely ver
 });
 test('regions: an explicit caller scope is never silently widened',async t=>{
  const f=await crowded(t);
- await assert.rejects(f.core.run('Fill email and Save.',{values:{email:'scope@example.invalid'},scope:'nav'}),{code:'OBSERVATION_LIMIT'});
+ const result=await f.core.run('Fill email and Save.',{values:{email:'scope@example.invalid'},scope:'nav',settleTimeoutMs:10});
+ assert.notEqual(result.status,'complete');
+ assert.ok(f.decider.requests.filter(request=>request.questions.action).every(request=>!(request.state.page?.elements??[]).some(element=>element.role==='textbox')));
  assert.equal(f.attempts.length,0);
 });
 test('regions: ambiguous region selection produces no form writes',async t=>{

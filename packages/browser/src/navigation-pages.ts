@@ -7,7 +7,7 @@ type Item = { kind: 'elements' | 'texts'; value: Record<string, unknown> };
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const encode = (value: unknown): DecisionRequest => JSON.parse(JSON.stringify(value));
 
-export async function decideNavigationPages(request: DecisionRequest, engine: DecisionEngine, decide: (request: DecisionRequest) => Promise<DecisionResult>, signal: AbortSignal): Promise<DecisionResult> {
+export async function decideNavigationPages(request: DecisionRequest, engine: DecisionEngine, decide: (request: DecisionRequest) => Promise<DecisionResult>, signal: AbortSignal, maxCandidates=250): Promise<DecisionResult> {
   const state = object(request.state), page = object(state.page), actions = object(state.actions);
   if (!request.questions.action || !Array.isArray(page.elements) || !Array.isArray(page.texts)) throw new BrowserError('OBSERVATION_LIMIT', 'This request has no paginable navigation observation.');
   const groups = new Map<string, Item[]>();
@@ -46,7 +46,9 @@ export async function decideNavigationPages(request: DecisionRequest, engine: De
   };
   const fits = (slice: Item[]) => {
     try {
-      return prepareDecisionParts(build(slice, 1, Math.max(3, items.length), true), engine).every(part => {
+      const candidate=build(slice, 1, Math.max(3, items.length), true);
+      if(Object.keys(object(object(candidate.state).actions)).length>maxCandidates || Object.values(candidate.questions).some(question=>Object.keys(question.criteria).length>255))return false;
+      return prepareDecisionParts(candidate, engine).every(part => {
         const estimate = estimateRequest(part);
         return estimate.totalTokens <= REQUEST_BUDGET.maxTotalTokens - 2000 && estimate.stateAndQuestionTokens <= REQUEST_BUDGET.maxStateAndQuestionTokens - 2000;
       });

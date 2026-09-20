@@ -151,3 +151,9 @@ ceiling, each bounded further by the remaining run deadline. `ACTION_UNAVAILABLE
 means the preflight did not dispatch the action; the explorer can refresh state
 within its bounded observation retries. This does not permit replaying uncertain
 business effects. The overall exploration deadline remains three minutes.
+
+Navigation can continue beyond a truncated DOM preview: the server acquires the
+complete supported observation for the current scope in local batches, then uses
+the model-budget pager. Preview limits are not interpreted as absence of later
+controls or text. Inspect responses can still report preview truncation; that
+flag describes the inspection preview, not a hard stop for navigation.

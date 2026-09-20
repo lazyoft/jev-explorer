@@ -15,10 +15,10 @@ import type { ActionPlan, ActResult, GroundedAction, OperationContext, RunEffect
 
 export interface RunHost {
   page(): Page;
-  capture(): Promise<Captured>;
+  capture(complete?:boolean): Promise<Captured>;
   captureChoice(ref:ElementRef,value:string):Promise<Captured>;
   regions():Promise<RegionIndex>;
-  captureRegion(ref:ElementRef):Promise<Captured>;
+  captureRegion(ref:ElementRef,complete?:boolean):Promise<Captured>;
   engine(): DecisionEngine;
   operation(): OperationContext;
   perform(plan: ActionPlan, captured: Captured, values: Record<string,string>, started: () => void): Promise<ActResult>;
@@ -69,10 +69,17 @@ export async function runGoal(host: RunHost, instruction: string, options: RunOp
   async function capture(purpose:'act'|'readback'='act'): Promise<Captured> {
     const current=activeRegions.get(purpose);
     if(current&&current.url===host.page().url()&&await current.ref.handle.evaluate(el=>el.isConnected&&!el.closest('[inert],[aria-hidden="true"]')).catch(()=>false)&&await current.ref.handle.isVisible().catch(()=>false)){
-      const scoped=await host.captureRegion(current.ref);captures.add(scoped);return scoped;
+      let scoped=await host.captureRegion(current.ref);captures.add(scoped);
+      if(purpose==='act'&&scoped.data.truncated){scoped=await host.captureRegion(current.ref,true);captures.add(scoped);}
+      return scoped;
     }
     activeRegions.delete(purpose);
     const observed=await host.capture();captures.add(observed);
+    if(purpose==='act'&&observed.data.truncated&&(options.scope||!observed.data.truncatedElements)){
+      const complete=await host.capture(true);captures.add(complete);
+      if(complete.data.truncated)throw new BrowserError('OBSERVATION_LIMIT','Complete local acquisition remained incomplete.');
+      return complete;
+    }
     if(options.scope||(!observed.data.truncatedElements&&!observed.data.truncatedTexts))return observed;
     const index=await host.regions();regionIndexes.push(index);
     if(!index.data.length)throw new BrowserError('OBSERVATION_LIMIT','No bounded semantic region can resolve the oversized or incomplete page.');
@@ -84,7 +91,8 @@ export async function runGoal(host: RunHost, instruction: string, options: RunOp
     const choice=decision.answers.region!.choice;
     if(choice==='__ambiguous__')throw new BrowserError('AMBIGUOUS_REGION','The task cannot distinguish the observed regions.');
     const ref=index.refs.get(choice);if(!ref)throw new BrowserError('OBSERVATION_LIMIT','No relevant region was selected.');
-    const scoped=await host.captureRegion(ref);captures.add(scoped);
+    let scoped=await host.captureRegion(ref);captures.add(scoped);
+    if(purpose==='act'&&scoped.data.truncated){scoped=await host.captureRegion(ref,true);captures.add(scoped);}
     if(scoped.data.truncatedElements||scoped.data.truncatedTexts)throw new BrowserError('OBSERVATION_LIMIT','The selected region still exceeds observation limits.');
     activeRegions.set(purpose,{ref,url:host.page().url()});regionHistory.push({purpose,name:ref.info.name,role:ref.info.role,frame:ref.info.frame});
     return scoped;
@@ -169,7 +177,8 @@ export async function runGoal(host: RunHost, instruction: string, options: RunOp
         if(!action||!state||!matchesControl(state,action.expected)){input.applied=false;input.ref=undefined;delete input.target;}
       }
       const quoted=inputs.length?{}:inputBindings(instruction).values;
-      const offered=actionCandidates(observed.data,quoted,host.candidateLimit);
+      const offered=actionCandidates(observed.data,quoted,host.candidateLimit,true);
+      const candidatePageLimit=Math.min(host.candidateLimit,250);
       const actions=new Map([...offered].filter(([,action])=>!inputs.length||!['fill','press'].includes(action.kind)));
       const bindings=bindingQuestions(observed.data,inputs);
       if(!actions.size&&!Object.keys(bindings).length&&steps.length&&await wait(observed))continue;
@@ -195,10 +204,12 @@ Input literals are available locally, not missing. Choose __none__ only if no ob
       if(key===lastRequest){if(await wait(observed))continue;return finish('stopped',inputs.some(i=>!i.applied)?'missing-input':'no-match');}
       lastRequest=key;
       let decision:DecisionResult;
-      try { decision=await decide(request); }
+      try { decision=offered.size>candidatePageLimit
+        ? await decideNavigationPages(filter(request) as DecisionRequest,host.engine(),decide,host.operation().signal,candidatePageLimit)
+        : await decide(request); }
       catch(error){
         if(error instanceof RequestBudgetError){
-          decision=await decideNavigationPages(filter(request) as DecisionRequest,host.engine(),decide,host.operation().signal);
+          decision=await decideNavigationPages(filter(request) as DecisionRequest,host.engine(),decide,host.operation().signal,candidatePageLimit);
         }else throw error;
       }
       const assignments=new Map<InputBinding,string>(),confidences=new Map<InputBinding,number>();let ambiguous=false;
@@ -275,7 +286,7 @@ Input literals are available locally, not missing. Choose __none__ only if no ob
       }
       if(action.deferred){
         if(planned.some(entry=>entry.target.id===action!.target!.id&&entry.input.applied))continue;
-        action=await resolveSelectChoice(action,instruction,decide,host.candidateLimit)??undefined;
+        action=await resolveSelectChoice(action,instruction,decide,candidatePageLimit)??undefined;
         if(!action)return finish('stopped','no-match');
       }
       if(kind==='commit'){

@@ -56,8 +56,12 @@ uses a navigation prompt rather than assuming a completed form or a Save step.
 
 When a navigation request exceeds the conservative budget, the runner pages the
 captured observation instead of requiring one semantic region to be small enough.
-This works for a full capture or inside an explicit/selected region. It never
-widens a caller scope and does not recover information omitted by DOM capture.
+This works for a full capture or inside an explicit/selected region and never
+widens a caller scope. When navigation needs more than the initial DOM preview,
+it acquires the complete selected DOM observation locally and transfers controls
+and texts in batches using the configured capture sizes. The model still receives
+only budgeted observation pages; preview truncation is not treated as a complete
+observation. Controls beyond the first batch retain their original references.
 
 Controls and text retain their original identities and contexts. Related items
 are grouped by frame/context; groups are split into smaller slices when needed.
@@ -93,3 +97,9 @@ one second before dispatch. Each element action is capped at two seconds,
 independently of the overall run deadline. An unavailable preflight is reported
 before a browser effect is marked attempted. The explorer may re-observe within
 its existing bounded recovery budget; uncertain executed effects are not replayed.
+
+Navigation text-preview overflow triggers complete local acquisition before model
+paging. Selected or explicit scopes that exceed capture sizes use the same path
+without widening their boundaries. Candidate enumeration remains local; decision
+pages respect the configured candidate count and at most 255 choices per question.
+Public snapshots and source extraction retain their existing preview semantics.

@@ -6,6 +6,6 @@ License: Apache License, Version 2.0 (see LICENSE).
 Modifications Copyright 2026 lazyoft.
 Modified upstream files: package.json, src/decision.ts, src/frontier.ts,
 src/index.ts, src/types.ts, src/runner.ts, src/dom.ts, src/observation.ts,
-src/native.ts, src/browser.ts, test/regressions.test.mjs. Added src/decision-context.ts, src/request-budget.ts, src/navigation-pages.ts and local regression tests.
+src/native.ts, src/browser.ts, src/actions.ts, test/regressions.test.mjs, test/regions.test.mjs. Added src/decision-context.ts, src/request-budget.ts, src/navigation-pages.ts and local regression tests.
 Upstream source notices and THIRD_PARTY_NOTICES.txt are retained.
 This fork is maintained by lazyoft and is not an upstream release.

@@ -1,4 +1,4 @@
-// Modified by lazyoft: verify pointer availability with a short trial before dispatch.
+// Modified by lazyoft: short pointer preflight and complete acquisition for paged navigation.
 import { runGoal } from './runner.js';
 import { randomUUID } from 'node:crypto';
 import { chromium, firefox, webkit, type Page, type ElementHandle } from 'playwright';
@@ -268,9 +268,9 @@ export class JevBrowser {
     return this.exclusive({ ...options, timeoutMs: options.timeoutMs ?? this.options.timeoutMs ?? 60_000 }, async operation => {
       await this.invalidate();
       return runGoal({
-        page: () => this.page, capture: () => capture(this.page,{...this.limits,scope:options.scope}),
+        page: () => this.page, capture: (complete=false) => capture(this.page,{...this.limits,scope:options.scope,complete,signal:operation.signal}),
         regions: () => captureRegions(this.page),
-        captureRegion: ref => capture(this.page,{...this.limits,selection:{frame:ref.frame,roots:[ref.handle]}}),
+        captureRegion: (ref,complete=false) => capture(this.page,{...this.limits,complete,signal:operation.signal,selection:{frame:ref.frame,roots:[ref.handle]}}),
         captureChoice: (ref,value) => captureComboboxChoice(this.page,ref,value,this.limits,{signal:operation.signal,timeoutMs:Math.min(this.remaining(operation),options.settleTimeoutMs??2000)}),
         engine: () => this.engine(), operation: () => ({signal:operation.signal,timeoutMs:this.remaining(operation)}),
         perform: (plan,observed,values,started) => this.executeCaptured(plan,observed,values,operation,started),

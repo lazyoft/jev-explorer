@@ -1,4 +1,4 @@
-// Modified by lazyoft: exclude viewport controls whose sampled click points are covered.
+// Modified by lazyoft: pointer filtering and complete local acquisition for paged transport.
 // Bundled once for evaluation in a frame. It contains no model-generated code.
 import { computeAccessibleName, getRole, isInaccessible } from 'dom-accessibility-api';
 
@@ -110,12 +110,15 @@ export function progressChanged(previous?: string): string | boolean {
   const key=JSON.stringify(parts);return previous===undefined?key:key!==previous;
 }
 const actionableRoles = new Set(['button','link','textbox','searchbox','checkbox','radio','switch','combobox','listbox','menuitem','menuitemcheckbox','menuitemradio','tab','option']);
-export function observe(options: { maxElements: number; maxTexts: number }, scopedRoots?: Element[], explicitRecords?: Element[]) {
+export function observe(options: { maxElements: number; maxTexts: number; complete?: boolean }, scopedRoots?: Element[], explicitRecords?: Element[]) {
   const nodes: Element[] = [];
   const elements: ReturnType<typeof describe>[] = [];
   const texts: { text: string; context: string; role: string; value?: boolean; attribute?: string }[] = [];
   const textNodes: Element[] = [];
   let truncatedElements = false, truncatedTexts = false, scanned = 0;
+  const elementLimit = options.complete ? Infinity : options.maxElements;
+  const textLimit = options.complete ? Infinity : options.maxTexts;
+  const scanLimit = options.complete ? Infinity : 6000;
   const roots: (Element | Document | ShadowRoot)[] = scopedRoots ? [...scopedRoots] : [document];
   const visited = new Set<Element>();
   for (let r = 0; r < roots.length; r++) {
@@ -124,7 +127,7 @@ export function observe(options: { maxElements: number; maxTexts: number }, scop
     for (const el of candidates) {
       if (visited.has(el)) continue;
       visited.add(el);
-      if (++scanned > 6000) { truncatedElements = true; truncatedTexts = true; break; }
+      if (++scanned > scanLimit) { truncatedElements = true; truncatedTexts = true; break; }
       if (el.shadowRoot) roots.push(el.shadowRoot);
       if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE','HEAD','META','TITLE','LINK'].includes(el.tagName) || !visible(el)) continue;
       const role = getRole(el) ?? '';
@@ -132,7 +135,7 @@ export function observe(options: { maxElements: number; maxTexts: number }, scop
       if (actionableRoles.has(role) || isFillable(el)) {
         const point = pointerPosition(el);
         if (point !== null) {
-          if (nodes.length >= options.maxElements) truncatedElements = true;
+          if (nodes.length >= elementLimit) truncatedElements = true;
           else { nodes.push(el); elements.push(describe(el, point)); }
         }
       }
@@ -142,28 +145,28 @@ export function observe(options: { maxElements: number; maxTexts: number }, scop
         const semanticText = ['heading','cell','rowheader','columnheader','definition','term','status','alert'].includes(role) || ['P','DD','DT','TD','TH','OUTPUT'].includes(el.tagName);
         const text = normalize((el as HTMLElement).innerText ?? el.textContent);
         if ((hasOwnText || semanticText) && text && text.length <= 700 && !el.querySelector('input,textarea,select,[contenteditable="true"]')) {
-          if (texts.length >= options.maxTexts) truncatedTexts = true;
+          if (texts.length >= textLimit) truncatedTexts = true;
           else { textNodes.push(el); texts.push({ text, context: context(el), role }); }
         }
       }
       if (el instanceof HTMLAnchorElement && el.hasAttribute('href')) {
-        if (texts.length >= options.maxTexts) truncatedTexts = true;
+        if (texts.length >= textLimit) truncatedTexts = true;
         else { textNodes.push(el); texts.push({ text: el.href, context: `${computeAccessibleName(el)} ${context(el)}`, role: 'link', attribute: 'href' }); }
       }
       if (['checkbox','radio','switch'].includes(role)) {
         const d = describe(el);
-        if (texts.length >= options.maxTexts) truncatedTexts = true;
+        if (texts.length >= textLimit) truncatedTexts = true;
         else { textNodes.push(el); texts.push({ text: d.info.name, context: d.info.context, role, ...(typeof d.info.checked === 'boolean' ? { value: d.info.checked } : {}) }); }
       }
     }
-    if (scanned > 6000) break;
+    if (scanned > scanLimit) break;
   }
   const recordNodes = (explicitRecords ?? [...visited].filter(el => el.matches('tbody tr,[role="row"],li,[role="listitem"],article'))).filter(el => visited.has(el) && visible(el));
   const records = recordNodes.map((el, index) => {
     const parent = recordNodes.findIndex(other => other !== el && other.contains(el) && !recordNodes.some(between => between !== other && between !== el && other.contains(between) && between.contains(el)));
     return { index, parent: parent < 0 ? undefined : parent, readOnly: !el.matches('form,input,textarea,select,[contenteditable="true"]') && !el.querySelector('input,textarea,select,[contenteditable="true"]'), context: normalize((el as HTMLElement).innerText).slice(0, 1000), texts: textNodes.flatMap((node, i) => el === node || el.contains(node) ? [i] : []) };
   });
-  return { nodes, elements, texts, records, recordInventoryComplete:scanned<=6000, truncatedElements, truncatedTexts, changeKey: String(progressChanged()), busy: !!document.querySelector('[aria-busy="true"]') };
+  return { nodes, elements, texts, records, recordInventoryComplete:scanned<=scanLimit, truncatedElements, truncatedTexts, changeKey: String(progressChanged()), busy: !!document.querySelector('[aria-busy="true"]') };
 }
 
 /** No global text search: options must belong to the popup declared by this control. */

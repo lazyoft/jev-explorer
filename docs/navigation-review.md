@@ -33,5 +33,6 @@ Live coverage is separate and does not establish general browser reliability.
 Oversized captured navigation observations now use bounded paging, including
 inside a selected/explicit region. Every captured control and text item remains
 available across slices. This removes the requirement that one semantic region
-alone fit the request budget. DOM capture limits, region discovery for truncated
-captures, indivisible oversized items and source-extraction budgets still apply.
+alone fit the request budget. Navigation now completes truncated text previews and selected/explicit regions
+through batched local acquisition. Region discovery for broad control-truncated
+previews, indivisible oversized items and source-extraction budgets still apply.

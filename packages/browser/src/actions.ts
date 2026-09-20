@@ -1,11 +1,12 @@
+// Modified by lazyoft: collect complete candidate inventories for paginated navigation.
 import type { Snapshot, GroundedAction, ElementInfo } from './types.js';
 import { BrowserError } from './errors.js';
 import type { DecisionRequest, DecisionResult } from './decision.js';
 
-export function actionCandidates(snapshot: Snapshot, values: Record<string, string>, limit: number): Map<string, GroundedAction> {
+export function actionCandidates(snapshot: Snapshot, values: Record<string, string>, limit: number, collectAll = false): Map<string, GroundedAction> {
   const result = new Map<string, GroundedAction>();
   const add = (action: GroundedAction) => {
-    if (result.size >= limit) throw new BrowserError('CANDIDATE_LIMIT', 'Too many action candidates. Narrow scope or raise maxCandidates.');
+    if (!collectAll && result.size >= limit) throw new BrowserError('CANDIDATE_LIMIT', 'Too many action candidates. Narrow scope or raise maxCandidates.');
     result.set(`a${result.size}`, action);
   };
   for (const target of snapshot.elements) {

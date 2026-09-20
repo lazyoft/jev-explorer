@@ -74,3 +74,11 @@ captured references. A short trial revalidates the selected target before dispat
 and individual element actions use a two-second ceiling rather than the remaining
 whole-run deadline. Safe preflight failures permit bounded re-observation; an
 uncertain executed effect still prevents automatic replay.
+
+DOM preview limits and model request limits are separate. Navigation recovers a
+truncated text preview, or a truncated explicit/selected region, by acquiring its
+complete supported DOM observation locally and transferring controls/texts in
+batches. The existing decision pager then bounds what reaches Jev. Global IDs and
+native references survive acquisition batches; caller scopes remain unchanged.
+Candidate-count limits apply to decision pages rather than dropping later controls.
+Public inspection previews and standalone extraction are unchanged.

@@ -2,6 +2,8 @@
 
 ## Unreleased — local browser engine and unified navigation
 
+- Complete truncated navigation observations through batched local acquisition before applying model-budget pagination, retaining later controls and scope boundaries.
+
 - Filter covered viewport controls before proposing actions; preserve usable click points and cap preflight/element-action waits independently of the run deadline.
 
 - Default exploration to three minutes and pass MCP client timeout options in the SDK 2 argument position.
