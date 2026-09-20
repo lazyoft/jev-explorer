@@ -45,6 +45,9 @@ export async function readObservation(page: Page): Promise<Observation> {
     const canGoBack = await main.evaluate(() => history.length > 1).catch(() => false);
     if (canGoBack) actions.push({ ref: 'back', kind: 'back', onScreen: true, role: 'page', name: 'go back to the previous page', context: '', frame: 0 });
   }
+  if (page.context().pages().filter(other => !other.isClosed()).length > 1) {
+    actions.push({ ref: 'close-tab', kind: 'close-tab', onScreen: true, role: 'page', name: 'close this tab and return to the previous one', context: '', frame: 0 });
+  }
   const title = await page.title().catch(() => '');
   if (title) texts.unshift({ ref: 'title', role: 'title', text: title, context: page.url(), frame: 0 });
   return { url: page.url(), title, busy, actions, texts };
@@ -60,6 +63,10 @@ function locate(page: Page, action: Action): Locator {
 export async function perform(page: Page, action: Action, value?: string): Promise<void> {
   if (action.kind === 'scroll') { await page.mouse.wheel(0, action.ref === 'scroll-up' ? -700 : 700); return; }
   if (action.kind === 'back') { await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {}); return; }
+  if (action.kind === 'close-tab') {
+    if (page.context().pages().filter(other => !other.isClosed()).length > 1) await page.close();
+    return;
+  }
   const locator = locate(page, action);
   if (await locator.count() !== 1) throw blocked('STALE_CONTROL', 'The chosen control is no longer on the page. Look at the page again.');
   if (action.kind === 'click') await locator.click({ timeout: ACTION_TIMEOUT });

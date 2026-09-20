@@ -1,7 +1,7 @@
 import type { Browser, BrowserContext, Page } from 'playwright';
 import type { Stop } from './errors.js';
 
-export type ActionKind = 'click' | 'type' | 'select' | 'check' | 'uncheck' | 'scroll' | 'back';
+export type ActionKind = 'click' | 'type' | 'select' | 'check' | 'uncheck' | 'scroll' | 'back' | 'close-tab';
 
 export interface Action {
   ref: string;

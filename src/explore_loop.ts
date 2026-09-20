@@ -160,7 +160,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       lastMark = mark;
 
       let effect: Effect = 'move';
-      if (action.kind !== 'scroll' && action.kind !== 'back') {
+      if (!['scroll', 'back', 'close-tab'].includes(action.kind)) {
         const answers = await ask({ effect: askEffect(session, action) });
         effect = answers.effect!.id as Effect;
       }

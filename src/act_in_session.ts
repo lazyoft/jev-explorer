@@ -22,7 +22,7 @@ export async function actInSession(store: SessionStore, decider: Decider, reques
     if (action.inputType === 'password' && request.text) session.secrets.push(request.text);
 
     let effect: Effect = 'move';
-    if (action.kind !== 'scroll' && action.kind !== 'back') {
+    if (!['scroll', 'back', 'close-tab'].includes(action.kind)) {
       const answers = await decider.ask({ effect: askEffect(session, action) }, signal);
       session.usage.messages++;
       effect = answers.answers.effect!.id as Effect;

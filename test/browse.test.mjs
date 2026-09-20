@@ -170,3 +170,23 @@ test('it follows a link that opens a new tab', async () => {
     assert.match(report.findings[0].source.url, /contact\.html$/);
   } finally { await site.stop(); }
 });
+
+test('it can close a tab it opened and carry on where it was', async () => {
+  const site = await startSite();
+  let opened = false;
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') {
+      const tab = pick(ask, holds('new tab'));
+      if (tab && !opened) { opened = true; return tab; }
+      return pick(ask, holds('close this tab')) ?? '__nothing__';
+    }
+    if (id === 'effect') return 'move';
+    if (id.startsWith('answer_')) return '__not_here__';
+    return undefined;
+  });
+  try {
+    const report = await run(decider, { url: site.url + '/newtab.html', goal: 'Look at the contact page and come back.' });
+    assert.match(report.page.url, /newtab\.html$/);
+    assert.ok(report.lastSteps.some(step => step.action.includes('close this tab')));
+  } finally { await site.stop(); }
+});
