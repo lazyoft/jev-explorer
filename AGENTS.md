@@ -53,6 +53,14 @@ Every one of these came from a real run, not from reading the code.
   their own paging options.
 - Offer only what is on screen. A page with 235 controls gives answers near
   0.25 confidence, which is a coin flip.
+- Read only what is on screen, and cut to the budget last. Collect every on-screen
+  element, order them by z-order with the top-most first, then cut. A cookie banner
+  is the last thing in the page: on repubblica.it it is control 468 of 474, so a
+  budget spent in document order never reaches it.
+- Share the budget across frames after the merge, never frame by frame. A main page
+  that fills the budget leaves nothing for the iframe that holds the banner, as on
+  theguardian.com. The z-order of the iframe element itself decides where its
+  content lands in the merged list.
 - A give-up answer below 0.5 confidence is asked once more before it is believed.
 - Check the answers on arrival at each new page. If you only check when the model
   gives up, it scrolls a long page until the budget is gone.

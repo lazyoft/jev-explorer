@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import type { Browser, BrowserContext, Frame, Locator, Page } from 'playwright';
-import { readPage } from './page-script.js';
+import { readPage, stackOrder } from './page-script.js';
 import { blocked } from '../domain/errors.js';
 import type { Action, Observation, TextBlock } from '../domain/types.js';
 
@@ -25,21 +25,40 @@ export async function goto(page: Page, url: string) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 }
 
+async function frameStackOrder(frame: Frame): Promise<number> {
+  let top = 0;
+  for (let current: Frame | null = frame; current?.parentFrame(); current = current.parentFrame()) {
+    const element = await current.frameElement().catch(() => null);
+    if (!element) break;
+    const own = await element.evaluate(stackOrder).catch(() => 0);
+    if (own > top) top = own;
+  }
+  return top;
+}
+
 export async function readObservation(page: Page): Promise<Observation> {
-  const actions: Action[] = [];
-  const texts: TextBlock[] = [];
+  const found: { action: Action; base: number; z: number }[] = [];
+  const blocks: { text: TextBlock; base: number; z: number }[] = [];
   let busy = false;
+  let scrollable = false;
+  let scrollableUp = false;
   const frames = page.frames();
   for (const [index, frame] of frames.entries()) {
-    if (actions.length >= ACTION_LIMIT && texts.length >= TEXT_LIMIT) break;
-    const raw = await frame.evaluate(readPage, { actions: ACTION_LIMIT - actions.length, texts: TEXT_LIMIT - texts.length }).catch(() => null);
+    const raw = await frame.evaluate(readPage, { actions: ACTION_LIMIT, texts: TEXT_LIMIT }).catch(() => null);
     if (!raw) continue;
     busy ||= raw.busy;
-    for (const item of raw.actions) actions.push({ ...item, ref: index + ':' + item.ref, frame: index });
-    for (const item of raw.texts) texts.push({ ...item, ref: index + ':' + item.ref, frame: index });
-    if (index === 0 && raw.scrollable) actions.push({ ref: 'scroll', kind: 'scroll', onScreen: true, role: 'page', name: 'scroll further down this page', context: '', frame: 0 });
-    if (index === 0 && raw.scrollableUp) actions.push({ ref: 'scroll-up', kind: 'scroll', onScreen: true, role: 'page', name: 'scroll back up this page', context: '', frame: 0 });
+    if (index === 0) { scrollable = raw.scrollable; scrollableUp = raw.scrollableUp; }
+    const base = index === 0 ? 0 : await frameStackOrder(frame);
+    for (const { z, ...item } of raw.actions) found.push({ action: { ...item, ref: index + ':' + item.ref, frame: index }, base, z });
+    for (const { z, ...item } of raw.texts) blocks.push({ text: { ...item, ref: index + ':' + item.ref, frame: index }, base, z });
   }
+  const topFirst = (left: { base: number; z: number }, right: { base: number; z: number }) => right.base - left.base || right.z - left.z;
+  found.sort(topFirst);
+  blocks.sort(topFirst);
+  const actions: Action[] = found.slice(0, ACTION_LIMIT).map(entry => entry.action);
+  const texts: TextBlock[] = blocks.slice(0, TEXT_LIMIT).map(entry => entry.text);
+  if (scrollable) actions.push({ ref: 'scroll', kind: 'scroll', onScreen: true, role: 'page', name: 'scroll further down this page', context: '', frame: 0 });
+  if (scrollableUp) actions.push({ ref: 'scroll-up', kind: 'scroll', onScreen: true, role: 'page', name: 'scroll back up this page', context: '', frame: 0 });
   const main = frames[0];
   if (main && page.url() !== 'about:blank') {
     const canGoBack = await main.evaluate(() => history.length > 1).catch(() => false);

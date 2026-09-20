@@ -1,5 +1,6 @@
 export interface RawAction {
   ref: string;
+  z: number;
   onScreen: boolean;
   kind: 'click' | 'type' | 'select' | 'check';
   role: string;
@@ -16,9 +17,19 @@ export interface RawAction {
 
 export interface RawText {
   ref: string;
+  z: number;
   role: string;
   text: string;
   context: string;
+}
+
+export function stackOrder(node: Element): number {
+  let top = 0;
+  for (let current: Element | null = node; current; current = current.parentElement) {
+    const value = Number(getComputedStyle(current).zIndex);
+    if (Number.isFinite(value) && value > top) top = value;
+  }
+  return top;
 }
 
 export interface RawPage {
@@ -42,6 +53,14 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     const style = getComputedStyle(node);
     if (style.visibility === 'hidden' || style.opacity === '0') return false;
     return !node.closest('[inert], [aria-hidden="true"]');
+  };
+  const zOrder = (node: Element) => {
+    let top = 0;
+    for (let current: Element | null = node; current; current = current.parentElement) {
+      const value = Number(getComputedStyle(current).zIndex);
+      if (Number.isFinite(value) && value > top) top = value;
+    }
+    return top;
   };
   const text = (node: Element | null | undefined) => (node instanceof HTMLElement ? node.innerText : node?.textContent ?? '').replace(/\s+/g, ' ').trim();
   const referenced = (node: Element, attributeName: string) => (node.getAttribute(attributeName) ?? '')
@@ -100,11 +119,9 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
   };
 
   const clickableRoles = ['button', 'link', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'gridcell', 'cell', 'treeitem', 'switch'];
-  const actions: RawAction[] = [];
-  let index = 0;
+  const found: { node: Element; z: number; action: Omit<RawAction, 'ref' | 'z'> }[] = [];
   for (const node of Array.from(document.querySelectorAll('*'))) {
-    if (actions.length >= limits.actions) break;
-    if (!visible(node) || disabled(node)) continue;
+    if (!visible(node) || !onScreen(node) || disabled(node)) continue;
     const role = explicitRole(node) || implicitRole(node);
     const editable = node instanceof HTMLElement && node.isContentEditable;
     let kind: RawAction['kind'] | '' = '';
@@ -116,15 +133,13 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     if (kind === 'type' && (node as HTMLInputElement).readOnly && !node.hasAttribute('aria-expanded') && !node.hasAttribute('aria-controls')) kind = 'click';
     const name = accessibleName(node);
     if (!name && kind === 'click') continue;
-    const ref = 'e' + index++;
-    node.setAttribute(attribute, ref);
     const input = node as HTMLInputElement;
     const value = node instanceof HTMLSelectElement
       ? Array.from(node.selectedOptions).map(option => option.label).join(', ')
       : node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ? input.value
       : editable ? text(node) : '';
-    actions.push({
-      ref, kind, onScreen: onScreen(node), role: role || 'generic', name: name.slice(0, 200), context: context(node),
+    found.push({ node, z: zOrder(node), action: {
+      kind, onScreen: true, role: role || 'generic', name: name.slice(0, 200), context: context(node),
       value: value.slice(0, 200),
       ...(kind === 'check' ? { checked: node instanceof HTMLInputElement ? node.checked : node.getAttribute('aria-checked') === 'true' } : {}),
       required: node.hasAttribute('required') || node.getAttribute('aria-required') === 'true',
@@ -134,22 +149,29 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
       ...(node instanceof HTMLSelectElement
         ? { options: Array.from(node.options).filter(option => !option.disabled).slice(0, 200).map(option => ({ index: option.index, label: text(option).slice(0, 120) })) }
         : {}),
-    });
+    } });
   }
+  found.sort((left, right) => right.z - left.z);
+  const actions: RawAction[] = found.slice(0, limits.actions).map((entry, position) => {
+    const ref = 'e' + position;
+    entry.node.setAttribute(attribute, ref);
+    return { ref, z: entry.z, ...entry.action };
+  });
 
   const blockTags = ['P', 'LI', 'TD', 'TH', 'DD', 'DT', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'FIGCAPTION', 'OUTPUT', 'SPAN', 'DIV', 'ADDRESS', 'TIME', 'STRONG', 'EM', 'LABEL'];
-  const texts: RawText[] = [];
+  const blocks: { z: number; block: Omit<RawText, 'ref' | 'z'> }[] = [];
   const seen = new Set<string>();
   for (const node of Array.from(document.querySelectorAll(blockTags.join(',') + ', [role="status"], [role="alert"], [role="heading"]'))) {
-    if (texts.length >= limits.texts) break;
-    if (!visible(node)) continue;
+    if (!visible(node) || !onScreen(node)) continue;
     if (node.querySelector(blockTags.join(','))) continue;
     const body = text(node);
     if (!body || body.length > 600 || seen.has(body)) continue;
     seen.add(body);
     const role = explicitRole(node) || (/^H[1-6]$/.test(node.tagName) ? 'heading' : 'text');
-    texts.push({ ref: 't' + texts.length, role, text: body, context: context(node) });
+    blocks.push({ z: zOrder(node), block: { role, text: body, context: context(node) } });
   }
+  blocks.sort((left, right) => right.z - left.z);
+  const texts: RawText[] = blocks.slice(0, limits.texts).map((entry, position) => ({ ref: 't' + position, z: entry.z, ...entry.block }));
 
   return {
     url: location.href,
