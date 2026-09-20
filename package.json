@@ -13,9 +13,9 @@
   },
   "scripts": {
     "build": "tsc",
+    "check": "npm run build && npm test",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "test:live": "node --env-file-if-exists=.env --test --test-timeout=180000 test/live/*.live.mjs",
-    "check": "npm run build && npm test"
+    "test:live": "node --env-file-if-exists=.env --test --test-timeout=180000 test/live/*.live.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",

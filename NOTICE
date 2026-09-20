@@ -1,0 +1,11 @@
+Jev Explorer
+Copyright 2026 lazyoft
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This project no longer includes source from any other project. The earlier
+local derivative of @tontoko/jev-browser was removed when the explorer was
+rebuilt, and nothing from it remains.
+
+The hosted TypeSafe service and the Jev model weights are not part of this
+repository. Their use is subject to the provider's terms.
