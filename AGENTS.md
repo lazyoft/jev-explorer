@@ -74,8 +74,12 @@ Every one of these came from a real run, not from reading the code.
   theguardian.com. The z-order of the iframe element itself decides where its
   content lands in the merged list.
 - A give-up answer below 0.5 confidence is asked once more before it is believed.
-- Check the answers on arrival at each new page. If you only check when the model
-  gives up, it scrolls a long page until the budget is gone.
+- Check the answers on each new screen, not on each new address. A scroll keeps
+  the address and shows different text. Keyed on the address alone, the code read
+  the Iran list once, scrolled eight times, and found nothing that was there.
+- A click that something on top of the page catches is not a failure. Read the
+  page again and choose again, the same way a control that vanished is handled.
+  Left to throw, it killed the whole run.
 - Follow a tab opened by a link, and offer to close it. A new tab has no history,
   so the go-back option never appears there.
 - A control that vanished before the click was never clicked, so read the page

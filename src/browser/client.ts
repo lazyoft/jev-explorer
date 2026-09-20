@@ -88,7 +88,11 @@ export async function perform(page: Page, action: Action, value?: string): Promi
   }
   const locator = locate(page, action);
   if (await locator.count() !== 1) throw blocked('STALE_CONTROL', 'The chosen control is no longer on the page. Look at the page again.');
-  if (action.kind === 'click') await locator.click({ timeout: ACTION_TIMEOUT });
+  if (action.kind === 'click') {
+    await locator.click({ timeout: ACTION_TIMEOUT }).catch(() => {
+      throw blocked('CLICK_BLOCKED', 'Something lying over the page caught the click. Look at the page again.');
+    });
+  }
   else if (action.kind === 'type') await locator.fill(value ?? '', { timeout: ACTION_TIMEOUT });
   else if (action.kind === 'select') await locator.selectOption({ label: value ?? '' }, { timeout: ACTION_TIMEOUT });
   else if (action.kind === 'check') await locator.check({ timeout: ACTION_TIMEOUT });

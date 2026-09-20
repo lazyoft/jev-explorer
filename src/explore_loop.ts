@@ -29,7 +29,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   let lastMark = '';
   let staleRetries = 0;
   const unhelpful = new Set<string>();
-  const readAnswersOn = new Set<string>();
+  const answeredScreens = new Set<string>();
 
   const ask = async (asks: Record<string, Ask>): Promise<Record<string, Answer>> => {
     if (session.usage.messages >= session.budgets.maxMessages) {
@@ -114,9 +114,11 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
     }
   };
 
+  const screenKey = () => session.observation.url + '|' + session.observation.texts.map(text => text.text).join('\u0000');
+
   const collectAnswers = async (): Promise<boolean> => {
-    if (!session.questions.length || readAnswersOn.has(session.observation.url)) return false;
-    readAnswersOn.add(session.observation.url);
+    if (!session.questions.length || answeredScreens.has(screenKey())) return false;
+    answeredScreens.add(screenKey());
     const texts = session.observation.texts.slice(0, TEXT_LIMIT);
     if (!texts.length) return false;
     const unanswered = () => session.questions.filter(item => !session.findings.some(finding => finding.key === item.key));
@@ -177,8 +179,8 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       try {
         await perform(session.page, action);
       } catch (error) {
-        if (!(error instanceof ExplorerError) || error.code !== 'STALE_CONTROL' || ++staleRetries > 3) throw error;
-        await trace(session, { kind: 'stale', action: label });
+        if (!(error instanceof ExplorerError) || !['STALE_CONTROL', 'CLICK_BLOCKED'].includes(error.code) || ++staleRetries > 3) throw error;
+        await trace(session, { kind: 'retrying', action: label, code: (error as ExplorerError).code });
         lastMark = '';
         await settle(session.page, 800);
         continue;
