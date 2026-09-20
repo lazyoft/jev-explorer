@@ -1,5 +1,5 @@
-import { BrowserError } from '@tontoko/jev-browser';
-import type { DecisionEngine } from '@tontoko/jev-browser';
+import { BrowserError } from '@lazyoft/jev-browser';
+import type { DecisionEngine } from '@lazyoft/jev-browser';
 
 export function chosen(result: Awaited<ReturnType<DecisionEngine['decide']>>, key: string, criteria: Record<string, unknown>, minConfidence = 0.7): string {
   const answer = result.answers[key];

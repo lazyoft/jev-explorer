@@ -4,7 +4,9 @@ Delegate browser exploration to Jev. Get back concise findings, source evidence,
 
 Jev Explorer is an MCP server for agents that should spend less context on routine browser navigation. Give it an objective rather than a sequence of clicks. It explores with [TypeSafe's Jev](https://docs.typesafe.ai/), retains progress, and hands control back when it finds evidence or needs help.
 
-**Early prototype.** It is built on the pinned [`@tontoko/jev-browser`](https://github.com/tontoko/jev-browser) engine. It does not claim universal browser reliability or a measured speedup over other agents.
+**Early prototype.** It includes a [locally maintained browser engine](packages/browser), derived from [`@tontoko/jev-browser`](https://github.com/tontoko/jev-browser) 0.5.0. It does not claim universal browser reliability or a measured speedup over other agents.
+
+Known navigation limitations are tracked in [the current code review](docs/navigation-review.md).
 
 ## What it does
 
@@ -13,6 +15,7 @@ Jev Explorer is an MCP server for agents that should spend less context on routi
 - Remembers findings, prior actions, observed outcomes, and supplied facts separately.
 - Returns a compact report instead of automatically sending the full DOM and trace to the supervising agent.
 - Waits for loading, dismisses optional obstructions, and verifies their disappearance before continuing.
+- Pages oversized navigation observations within the request budget while retaining captured controls and text.
 - Stops on budgets, repeated actions without progress, validation problems, and uncertain submission outcomes.
 - Lets the supervisor inspect, act, continue, or close the same session.
 
@@ -30,7 +33,7 @@ Jev continues in the same session
 
 ## Install
 
-Requires **Node.js 24+**. An API key is needed for Jev inference. Native inspection and supervisor actions do not call the model.
+Requires **Node.js 24+**. An API key is needed for Jev inference. Inspection does not call the model. Supervised clicks, key presses and selection changes use a contextual Jev effect check.
 
 ```sh
 git clone https://github.com/lazyoft/jev-explorer.git
@@ -43,7 +46,7 @@ cp .env.example .env
 
 Set `TYPESAFE_API_KEY` in your local `.env` file. It is ignored by Git. The default model is `jev-1.13.0`; override it with `JEV_MODEL` when deliberately evaluating another version.
 
-The browser engine comes from a pinned GitHub release archive. Its integrity is recorded in `package-lock.json`; see [dependency provenance](docs/dependency.md).
+The browser engine source is included in `packages/browser` and built as a local npm workspace. Upstream provenance, licenses and local changes are recorded in [dependency provenance](docs/dependency.md).
 
 ## Connect an MCP client
 
@@ -134,7 +137,17 @@ Supply known data separately from the objective. Jev chooses which supplied datu
 
 Use `data` or legacy `values` in an exploration, not both. `jev_continue` accepts additional or replacement `data` items. A verified field is checked again when it remains visible; changing its supplied datum or its displayed value makes it eligible for filling again. Data is available to the workflow, not a requirement to fill every item on every page.
 
-The first adapters support text inputs, native date inputs, text dates with an explicit format, number inputs, checkboxes and single native selects. Date values must be real calendar dates in `YYYY-MM-DD` form. For text controls, supported visible hints are `DD/MM/YYYY`, `MM/DD/YYYY`, `DD.MM.YYYY`, `DD-MM-YYYY`, `YYYY/MM/DD` and `YYYY-MM-DD`, including Italian `gg/mm/aaaa`. No day/month order is guessed. Accessible autocomplete lists and custom calendars are also supported when the field identifies its popup with `aria-controls` or `aria-owns`. Autocomplete chooses among observed suggestions instead of requiring an exact label match. Calendars can navigate month/year controls, select a day and confirm it. Both require a valid field readback. Combined date ranges, split date controls, visual-only calendars and widgets without an identifiable owned popup can still require handoff.
+The first adapters support text inputs, native date inputs, text dates with an explicit format, combined date ranges, number inputs, checkboxes and single native selects. Date values must be real calendar dates in `YYYY-MM-DD` form. For text controls, supported visible hints are `DD/MM/YYYY`, `MM/DD/YYYY`, `DD.MM.YYYY`, `DD-MM-YYYY`, `YYYY/MM/DD` and `YYYY-MM-DD`, including Italian `gg/mm/aaaa`. No day/month order is guessed. Accessible autocomplete lists and custom calendars are also supported when the field identifies its popup with `aria-controls` or `aria-owns`. Autocomplete chooses among observed suggestions instead of requiring an exact label match. Calendars can navigate month/year controls, select a day and confirm it. Both require a valid field readback. Split date controls, visual-only calendars and widgets without an identifiable owned popup can still require handoff.
+
+For a combined check-in/check-out control, provide one `date-range` item:
+
+```json
+{"stay":{"type":"date-range","value":{"start":"2030-04-11","end":"2030-04-14"},"description":"Check-in through check-out"}}
+```
+
+Both endpoints must be valid ISO dates, and end must follow start. The adapter uses a directly owned calendar or a visible tab-controlled panel in the same form. It verifies both endpoints in order before treating the range as applied. Composite buttons whose displayed value already matches the supplied scalar can be verified without editing; changing such a value still requires a supported editor.
+
+Autocomplete observes suggestion changes and loading state for a bounded period. A no-match on an initial suggestion set does not immediately fail while a newer set may still arrive; unchanged sets do not trigger repeated inference or retyping.
 
 Field/data associations are requested together. The code applies the first relevant association; if none applies, the browser engine continues navigation. Native select options are chosen in a further grounded decision using the supplied value. Model selection cannot manufacture a new value. `typedInputs` reports which datum was read back in which field; it does not certify a reservation, a saved record, or continued correctness after a later page transition.
 
@@ -171,7 +184,7 @@ Reports are normally limited to about 6,500 characters. Full traces and screensh
 
 Runs default to `$XDG_STATE_HOME/jev-explorer/runs`, or `~/.local/state/jev-explorer/runs`. Override this with `JEV_EXPLORER_RUNS`. Sessions live in one MCP server process and expire after 30 minutes of inactivity. A server restart preserves files, not browser memory or cookies.
 
-`allowCommit` defaults to false. The built-in guards are conservative heuristics, **not a security boundary or a universal read-only mode**. Browser controls can have unexpected effects. Use appropriately restricted accounts and only delegate authorized work.
+`allowCommit` defaults to false. Jev classifies action effects in context; code additionally requires commit permission for business mutations. These model-dependent checks are **not a security boundary or a universal read-only mode**. Browser controls can have unexpected effects. Use appropriately restricted accounts and only delegate authorized work.
 
 Page text and evidence may contain sensitive information and may be sent to TypeSafe as decision context. Do not publish run directories. See [security and data handling](SECURITY.md).
 
@@ -194,6 +207,7 @@ npm run test:live
 npm run test:live:typed
 npm run test:live:widgets
 npm run test:live:page-state
+npm run test:live:date-range
 ```
 
 This makes paid API calls using synthetic local data. It does not run in CI or use real accounts. Local results are not a benchmark of arbitrary websites.

@@ -19,7 +19,7 @@ test('real Jev chooses fields and supplied typed data across a guest and travel 
     objective: 'Fill the guest first and last name from supplied data, click Next, then fill all supplied travel details including breakfast and click Search. Stop when synthetic hotel availability appears. This is an authorized local search; do not book anything.',
     data: tripData, questions: [{ key: 'availability', question: 'Quote the synthetic hotel availability result including cleanliness and nights.' }],
     maxSteps: 25, maxCalls: 45, timeoutMs: 90000,
-  } }, undefined, { timeout: 120000 });
+  } }, { timeout: 240000 });
   const report = response.structuredContent;
   const evidence = { wallMs: Math.round(performance.now() - started), report, records: site.records };
   await mkdir('results', { recursive: true }); await writeFile('results/typed-live.json', JSON.stringify(evidence, null, 2));

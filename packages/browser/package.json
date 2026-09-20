@@ -1,0 +1,64 @@
+{
+  "name": "@lazyoft/jev-browser",
+  "version": "0.5.0-lazyoft.1",
+  "description": "Locally maintained browser engine derived from tontoko/jev-browser 0.5.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "import": "./dist/mcp.js"
+    }
+  },
+  "bin": {
+    "jev-browser": "dist/cli.js",
+    "jev-browser-mcp": "dist/mcp-stdio.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.txt",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && esbuild src/dom.ts --bundle --platform=browser --format=iife --global-name=JevDOM --outfile=dist/dom.bundle.cjs",
+    "test": "node scripts/test.mjs",
+    "check": "npm run build && npm test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@typesafe-ai/sdk": "0.6.0",
+    "dom-accessibility-api": "0.7.1",
+    "playwright": "1.63.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.6",
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lazyoft/jev-explorer.git",
+    "directory": "packages/browser"
+  },
+  "private": true,
+  "x-upstream": {
+    "repository": "https://github.com/tontoko/jev-browser",
+    "commit": "92a318b1f4215f064e9dd663172fb08534d2abdc",
+    "version": "0.5.0",
+    "modifications": "Maintained by lazyoft; local workspace metadata and request preparation before size checks."
+  }
+}

@@ -14,6 +14,9 @@ function formEngine() {
         const target = request.state.page.elements.find(element => element.name === input?.label || element.fieldName === input?.path);
         if (target && Object.hasOwn(question.criteria, target.id)) choice = target.id;
       } else if (id.startsWith('effect_')) choice = request.state.actions?.[id.slice('effect_'.length)]?.target?.name === 'Save' ? 'commit' : 'advance';
+      else if (id.startsWith('blocker_')) choice = request.state.objective.includes('Inspect why this report') ? 'blocking' : 'observation';
+      else if (id === 'action_effect') choice = 'advance';
+      else if (id === 'page_phase') choice = 'ready';
       else if (id === 'completion') choice = 'complete';
       else if (id.startsWith('read_')) {
         const input = request.state.inputs.find(input => question.instructions.includes(JSON.stringify(input.path)));

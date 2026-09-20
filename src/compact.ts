@@ -30,6 +30,7 @@ export function compactReport(session: Session, { targets = false, offset = 0 } 
     needs: session.needs.slice(0, 8).map(need => short(need, 200)),
     recentActions: session.history.slice(-6).map(event => ({ action: short(event.action, 140), outcome: short(event.outcome, 180) })),
     usage: active ? { calls: active.calls, failedCalls: active.failedCalls, inputTokens: active.inputTokens, outputTokens: active.outputTokens, elapsedMs: active.elapsedMs, observationRetries: active.observationRetries } : undefined,
+    policyUsage: session.policyUsage,
     artifacts: session.artifacts,
     sessionAlive: !session.closed,
     limitations: session.limitations.slice(-3).map(item => short(item, 180)),

@@ -1,10 +1,12 @@
+import { observedName } from './control-name.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { BrowserError } from '@tontoko/jev-browser';
-import type { DecisionEngine, DecisionRequest, ElementInfo, JevBrowser, NativeCommand, OperationOptions, Snapshot } from '@tontoko/jev-browser';
+import { BrowserError } from '@lazyoft/jev-browser';
+import type { DecisionEngine, DecisionRequest, ElementInfo, JevBrowser, NativeCommand, OperationOptions, Snapshot } from '@lazyoft/jev-browser';
 import type { Locator } from 'playwright';
 import { chosen } from './input-choice.js';
 import { autocomplete, calendar } from './widgets.js';
+import { dateRange } from './date-range.js';
 
 const meta = { description: z.string().max(500).optional() };
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
@@ -14,6 +16,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
 export const datumSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), value: z.string().max(10000), ...meta }).strict(),
   z.object({ type: z.literal('date'), value: isoDate, ...meta }).strict(),
+  z.object({ type: z.literal('date-range'), value: z.object({ start: isoDate, end: isoDate }).strict().refine(value => value.start < value.end, 'Range end must be after start.'), ...meta }).strict(),
   z.object({ type: z.literal('number'), value: z.number().finite(), ...meta }).strict(),
   z.object({ type: z.literal('boolean'), value: z.boolean(), ...meta }).strict(),
 ]);
@@ -21,8 +24,8 @@ export const dataSchema = z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,60}
 export type Datum = z.infer<typeof datumSchema>;
 export type TypedData = z.infer<typeof dataSchema>;
 export interface AppliedDatum { signature: string; key: string; value: string | boolean; url: string; field: string; format?: string }
-export interface TypedFillResult { filled: boolean; field?: string; key?: string; format?: string; alreadyCorrect?: boolean }
-export interface Control { element: ElementInfo; locator: Locator; placeholder: string; value: string | boolean; identity: string }
+export interface TypedFillResult { formScope?: string; frame?: number; filled: boolean; field?: string; key?: string; format?: string; alreadyCorrect?: boolean }
+export interface Control { formScope?: string; element: ElementInfo; locator: Locator; placeholder: string; value: string | boolean; identity: string }
 
 export function formatDate(value: string, inputType: string, hint: string): { value: string; format: string } {
   if (inputType === 'date') return { value, format: 'YYYY-MM-DD' };
@@ -33,22 +36,27 @@ export function formatDate(value: string, inputType: string, hint: string): { va
   return { value: formats[0].replace('yyyy', year).replace('mm', month).replace('dd', day), format: formats[0].toUpperCase() };
 }
 
-async function controls(core: JevBrowser, snapshot: Snapshot): Promise<Control[]> {
+async function controls(core: JevBrowser, snapshot: Snapshot, data: TypedData): Promise<Control[]> {
   const result: Control[] = [];
   for (const element of snapshot.elements) {
     const popup = element.popup && element.popup !== 'false' && element.controls?.length;
-    if (element.disabled || (element.readOnly && !popup) || element.inputType === 'password' || !(element.fillable || element.tag === 'select' || element.role === 'checkbox' || popup)) continue;
+    if (element.role === 'checkbox' && !Object.values(data).some(datum => datum.type === 'boolean')) continue;
+    if (element.disabled || (element.readOnly && !popup) || element.inputType === 'password' || !(element.fillable || element.tag === 'select' || element.role === 'checkbox' || popup || element.role === 'button')) continue;
     const frame = core.page.frames()[element.frame];
     if (!frame) continue;
-    let locator = frame.getByLabel(element.name, { exact: true });
-    if (await locator.count() !== 1 && element.role) locator = frame.getByRole(element.role as Parameters<typeof frame.getByRole>[0], { name: element.name, exact: true });
+    let locator = frame.getByLabel(observedName(element.name));
+    if (await locator.count() !== 1 && element.role) locator = frame.getByRole(element.role as Parameters<typeof frame.getByRole>[0], { name: observedName(element.name) });
     if (await locator.count() !== 1) continue;
     const details = await locator.evaluate(node => {
+      const form = node.closest('form, [role="form"]');
+      const forms = Array.from(node.ownerDocument.querySelectorAll('form, [role="form"]'));
+      const formScope = form ? 'form, [role="form"] >> nth=' + forms.indexOf(form) : undefined;
       const native = node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement;
-      return { tag: node.tagName.toLowerCase(), name: node.getAttribute('name') ?? '', value: node instanceof HTMLInputElement && node.type === 'checkbox' ? node.checked : node.getAttribute('aria-valuetext') ?? (native ? node.value : node.textContent?.trim() || node.getAttribute('aria-label') || ''), placeholder: node.getAttribute('placeholder') ?? '' };
+      return { formScope, position: Array.from((node.closest('form') ?? node.ownerDocument).querySelectorAll('button')).indexOf(node as HTMLButtonElement), disclosure: node.hasAttribute('aria-expanded'), tag: node.tagName.toLowerCase(), name: node.getAttribute('name') ?? '', value: node instanceof HTMLInputElement && node.type === 'checkbox' ? node.checked : node.getAttribute('aria-valuetext') ?? (native ? node.value : node.textContent?.trim() || node.getAttribute('aria-label') || ''), placeholder: node.getAttribute('placeholder') ?? '' };
     }, undefined, { timeout: 1000 }).catch(() => null);
+    if (element.role === 'button' && !popup && !details?.disclosure) continue;
     if (!details || details.tag !== element.tag || (element.fieldName && details.name !== element.fieldName)) continue;
-    result.push({ element, locator, value: details.value, placeholder: details.placeholder, identity: JSON.stringify([snapshot.url, element.frame, element.formName, element.name, element.fieldName, element.inputType, details.placeholder]) });
+    result.push({ formScope: details.formScope, element, locator, value: details.value, placeholder: details.placeholder, identity: JSON.stringify([snapshot.url, element.frame, element.formName, element.tag === 'button' ? 'button:' + details.position : element.name, element.fieldName, element.inputType, details.placeholder]) });
   }
   return result;
 }
@@ -70,13 +78,12 @@ function representation(datum: Datum, control: Control): { value: string | boole
 export async function fillTypedData(args: {
   core: JevBrowser; snapshot: Snapshot; data: TypedData; applied: Record<string, AppliedDatum>;
   act: (command: NativeCommand, target: ElementInfo) => Promise<void>;
-  authorize: (element: ElementInfo) => boolean;
   objective: string; engine: DecisionEngine; operation: OperationOptions;
   record: (entry: { field: string; key: string; format?: string; outcome: string }) => Promise<void>;
 }): Promise<TypedFillResult> {
   const { core, snapshot, data, applied, objective, engine, operation } = args;
   operation.signal?.throwIfAborted();
-  const all = await controls(core, snapshot);
+  const all = await controls(core, snapshot, data);
   const pending = all.filter(control => {
     const prior = applied[control.identity];
     if (!prior) return true;
@@ -118,14 +125,22 @@ export async function fillTypedData(args: {
   const { control, datumId } = binding;
   const index = Number(datumId.slice(1));
   const [key, datum] = entries[index];
-  if (!args.authorize(control.element)) throw new BrowserError('ACTION_DENIED', 'This exploration did not authorize the selected input effect.');
+  if (control.element.tag === 'button' && datum.type !== 'date-range' && datum.type !== 'date') {
+    const criteria = { match: 'The control already displays the supplied value for the described dimension.', different: 'The displayed value differs from the supplied value.', unknown: 'The described value cannot be verified from the control.' };
+    const verified = await engine.decide({ state: { field: control.element.name, actual: control.value, supplied: datum.value, description: datum.description ?? key }, questions: { displayed_value: { type: 'choice', instructions: 'Check whether the supplied value is already present in this composite control. Keep dimensions separate, such as adults, children and rooms. Do not infer omitted values.', criteria } } }, operation);
+    if (chosen(verified, 'displayed_value', criteria) !== 'match') throw new BrowserError('INPUT_WIDGET_UNSUPPORTED', 'The composite control needs an editor before its supplied value can be applied.');
+    applied[control.identity] = { signature: signature(datum), key, value: control.value, url: snapshot.url, field: control.element.name, format: 'displayed-value' };
+    await args.record({ field: control.element.name, key, format: 'displayed-value', outcome: 'Existing displayed value verified; no input action needed.' });
+    return { formScope: control.formScope, frame: control.element.frame, filled: true, field: control.element.name, key, format: 'displayed-value', alreadyCorrect: true };
+  }
+  const rangeResult = datum.type === 'date-range' ? await dateRange({ core, control, datum, objective, engine, operation, previousSelection: Object.values(applied).find(previous => previous.key === key && previous.signature === signature(datum))?.value, act: args.act }) : undefined;
   const widget = datum.type === 'date' && control.element.inputType !== 'date' && control.element.popup && control.element.popup !== 'false' ? calendar : control.element.role === 'combobox' && control.element.tag !== 'select' ? autocomplete : undefined;
-  const formatted = widget ? await widget({ core, control, datum, key, objective, engine, operation, act: args.act }) : representation(datum, control);
+  const formatted = rangeResult ?? (widget ? await widget({ core, control, datum, key, objective, engine, operation, previousSelection: Object.values(applied).find(previous => previous.key === key && previous.signature === signature(datum))?.value, act: args.act }) : representation(datum, control));
   let expected = formatted.value;
-  if (widget) {
+  if (widget || rangeResult) {
     applied[control.identity] = { signature: signature(datum), key, value: expected, url: snapshot.url, field: control.element.name, format: formatted.format };
-    await args.record({ field: control.element.name, key, format: formatted.format, outcome: 'Owned popup selection and field readback verified.' });
-    return { filled: true, field: control.element.name, key, format: formatted.format };
+    await args.record({ field: control.element.name, key, format: formatted.format, outcome: 'reused' in formatted && formatted.reused ? 'Existing displayed selection matches previously verified input; no typing needed.' : 'Owned popup selection and field readback verified.' });
+    return { formScope: control.formScope, frame: control.element.frame, filled: true, field: control.element.name, key, format: formatted.format, alreadyCorrect: 'reused' in formatted && formatted.reused === true };
   }
   if (control.element.tag === 'select') {
     const candidates = (control.element.options ?? []).filter(option => !option.disabled);
@@ -148,5 +163,5 @@ export async function fillTypedData(args: {
   if (!checked || checked.value !== expected || !checked.valid) throw new BrowserError('INPUT_READBACK_FAILED', `The field ${control.element.name} did not retain a valid supplied value.`);
   applied[control.identity] = { signature: signature(datum), key, value: expected, url: snapshot.url, field: control.element.name, format: formatted.format };
   await args.record({ field: control.element.name, key, format: formatted.format, outcome: 'Value read back and field validity checked.' });
-  return { filled: true, field: control.element.name, key, format: formatted.format, alreadyCorrect: control.value === expected };
+  return { formScope: control.formScope, frame: control.element.frame, filled: true, field: control.element.name, key, format: formatted.format, alreadyCorrect: control.value === expected };
 }

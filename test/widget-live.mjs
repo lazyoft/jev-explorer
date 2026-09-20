@@ -19,7 +19,7 @@ test('real Jev completes owned autocomplete and custom calendars without supervi
     objective: 'Choose the supplied destination in the autocomplete, select arrival and departure in their calendars, then click Search. Use the North Coast city. Stop when the widget search result appears. This is an authorized read-only local search, not a reservation.',
     data: widgetData, questions: [{ key: 'availability', question: 'Quote the displayed availability result, verbatim including the destination, arrival date, departure date and cleanliness rating.' }],
     maxSteps: 25, maxCalls: 45, timeoutMs: 90000,
-  } }, undefined, { timeout: 120000 });
+  } }, { timeout: 240000 });
   const report = response.structuredContent;
   const evidence = { wallMs: Math.round(performance.now() - started), report, records: site.records };
   await mkdir('results', { recursive: true }); await writeFile('results/widget-live.json', JSON.stringify(evidence, null, 2));

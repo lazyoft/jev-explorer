@@ -90,3 +90,37 @@ test('calendar grid cells omitted by the engine are observed and selected within
   assert.equal(report.typedInputs[0]?.format, 'calendar-selection');
   assert.equal(await page.evaluate(() => window.wrongClicks), 0);
 });
+
+
+test('autocomplete waits for a changed suggestion set without retyping or selecting stale options', async t => {
+  const site = await widgetSite(t); const engine = widgetEngine();
+  const explorer = new BrowserExplorer({ root: await temporaryRoot(), engineFactory: () => engine }); t.after(() => explorer.shutdown());
+  const report = await explorer.explore({ url: site.url + '?mode=stale-options', objective: 'Select the supplied destination.', data: { city: widgetData.city }, maxSteps: 2 });
+  const page = explorer.get(report.sessionId).core.page;
+  assert.equal(await page.getByLabel('Destination', { exact: true }).inputValue(), 'Harbor City, North Coast');
+  assert.equal(await page.evaluate(() => window.wrongClicks), 0);
+  assert.equal(await page.evaluate(() => window.selectionClicks), 1);
+  assert.equal(report.typedInputs.length, 1);
+});
+
+
+test('navigation does not retype an autocomplete selection that is still displayed correctly', async t => {
+  const site = await widgetSite(t);
+  const explorer = new BrowserExplorer({ root: await temporaryRoot(), engineFactory: widgetEngine }); t.after(() => explorer.shutdown());
+  const first = await explorer.explore({ url: site.url, objective: 'Choose the supplied destination.', data: { city: widgetData.city }, maxSteps: 2 });
+  assert.equal(first.typedInputs.length, 1);
+  const page = explorer.get(first.sessionId).core.page;
+  await page.goto(site.url + '/persisted');
+  const second = await explorer.continue(first.sessionId);
+  assert.equal(await page.getByLabel('Destination').inputValue(), 'Harbor City, North Coast');
+  assert.equal(await page.evaluate(() => window.retyped), 0);
+  assert.ok(second.recentActions.some(action => action.outcome.includes('no typing needed')), JSON.stringify(second));
+});
+
+
+test('onward search uses the filled form despite a crowded background page', async t => {
+  const site = await widgetSite(t);
+  const explorer = new BrowserExplorer({ root: await temporaryRoot(), engineFactory: widgetEngine }); t.after(() => explorer.shutdown());
+  const report = await explorer.explore({ url: site.url + '?mode=crowded', objective: 'Fill the supplied destination and dates, then Search.', data: widgetData, maxCalls: 40 });
+  assert.deepEqual(site.records, [{ place: 'Harbor City, North Coast', placeId: 'harbor-north', arrival: '2030-04-11', departure: '2030-04-14' }], JSON.stringify(report));
+});

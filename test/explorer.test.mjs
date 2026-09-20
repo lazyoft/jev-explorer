@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
 import { BrowserExplorer } from '../dist/explore-browser.js';
-import { JevBrowser, BrowserError } from '@tontoko/jev-browser';
+import { JevBrowser, BrowserError } from '@lazyoft/jev-browser';
 import { localSite, temporaryRoot, scriptedEngine } from './fixtures.mjs';
 
 const question = { key: 'notice', question: 'Cancellation notice for a video appointment, verbatim including its unit' };
@@ -167,4 +167,25 @@ test('cancelling a decision preserves an inspectable browser and performs no lat
   assert.equal(report.sessionAlive, true);
   assert.equal((await explorer.inspect(opened.sessionId)).page.url, site.url + '/');
   assert.ok(site.requests.every(request => request.url === '/'));
+});
+
+
+test('a read failure after observed navigation resumes without replaying that navigation', async t => {
+  const site = await localSite(t); let runCount = 0;
+  const explorer = new BrowserExplorer({ root: await temporaryRoot(), engineFactory: scriptedEngine, launch: async options => {
+    const core = await JevBrowser.launch(options); const run = core.run.bind(core);
+    core.run = async (...args) => {
+      runCount++;
+      if (runCount === 1) {
+        await core.page.goto(site.url + '/help');
+        throw Object.assign(new BrowserError('RUN_FAILED', 'Synthetic detached-frame observation after navigation'), { partial: { status: 'stopped', reason: 'error', steps: [], effects: [{ kind: 'advance', status: 'observed' }] } });
+      }
+      return run(...args);
+    };
+    return core;
+  } }); t.after(() => explorer.shutdown());
+  const report = await explorer.explore({ url: site.url, objective: 'Find the cancellation notice.', questions: [question] });
+  assert.equal(report.status, 'ready_for_review');
+  assert.equal(report.usage.observationRetries, 1);
+  assert.equal(site.requests.filter(request => request.url === '/help').length, 1);
 });

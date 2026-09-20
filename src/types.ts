@@ -1,4 +1,4 @@
-import type { BrowserLaunchOptions, DecisionEngine, JevBrowser, RunResult, RunValue, Snapshot, TextEvidence } from '@tontoko/jev-browser';
+import type { BrowserLaunchOptions, DecisionEngine, JevBrowser, RunResult, RunValue, Snapshot, TextEvidence } from '@lazyoft/jev-browser';
 import type { PageStateMemory } from './page-state.js';
 import type { TypedData, AppliedDatum } from './typed-data.js';
 
@@ -13,6 +13,9 @@ export interface ActiveRun extends Settings {
 }
 export interface Session {
   id: string; dir: string; core: JevBrowser; touched: number; busy: boolean; closed: boolean; status: string; reason: string;
+  inputScope?: { scope: string; url: string };
+  recordedActions?: Set<string>;
+  policyUsage?: { calls: number; inputTokens: number; outputTokens: number };
   objective: string; values: Values; data: TypedData; typedApplied: Record<string, AppliedDatum>;
   questions: { key: string; question: string }[]; facts: Fact[]; history: History[]; notes: string[]; needs: string[];
   applied: Record<string, { role?: string; name?: string; frame?: number; readback: boolean }>;

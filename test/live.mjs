@@ -17,7 +17,7 @@ test('real Jev through MCP discovers an unknown value, requests missing input an
   await client.connect(transport);
   const call = async (name, args) => {
     const started = performance.now();
-    const result = await client.callTool({ name, arguments: args }, undefined, { timeout: 90000 });
+    const result = await client.callTool({ name, arguments: args }, { timeout: 240000 });
     assert.notEqual(result.isError, true, JSON.stringify(result));
     console.log(JSON.stringify({ tool: name, wallMs: Math.round(performance.now() - started), reportChars: JSON.stringify(result.structuredContent).length, report: result.structuredContent }));
     return result.structuredContent;
