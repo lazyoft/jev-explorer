@@ -1,63 +1,31 @@
 {
   "name": "@lazyoft/jev-explorer",
-  "version": "0.4.0",
+  "version": "1.0.0-alpha.1",
   "private": true,
   "type": "module",
+  "description": "Goal-driven browser exploration with Jev. The code reads, Jev chooses.",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=24"
   },
+  "bin": {
+    "jev-explorer": "dist/mcp/main.js"
+  },
   "scripts": {
-    "start": "node bin/jev-explorer.mjs",
+    "build": "tsc",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "test:live": "node --env-file-if-exists=.env --test --test-concurrency=1 --test-timeout=120000 test/live.mjs",
-    "check": "npm run build && npm run test:browser && npm test",
-    "build": "npm run build --workspace @lazyoft/jev-browser && tsc",
-    "prepack": "npm run build",
-    "test:live:typed": "node --env-file-if-exists=.env --test --test-timeout=120000 test/typed-live.mjs",
-    "test:live:widgets": "node --env-file-if-exists=.env --test --test-timeout=120000 test/widget-live.mjs",
-    "test:live:public-widgets": "node --env-file-if-exists=.env --test --test-concurrency=1 --test-timeout=120000 test/widget-public-live.mjs",
-    "test:live:page-state": "node --env-file-if-exists=.env --test --test-timeout=120000 test/page-state-live.mjs",
-    "test:live:date-range": "node --env-file-if-exists=.env --test --test-timeout=120000 test/date-range-live.mjs",
-    "test:browser": "npm test --workspace @lazyoft/jev-browser",
-    "test:live:navigation": "node --env-file-if-exists=.env --test --test-timeout=30000 test/navigation-policy-live.mjs"
+    "test:live": "node --env-file-if-exists=.env --test --test-timeout=180000 test/live/*.live.mjs",
+    "check": "npm run build && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
-    "zod": "4.6.5",
-    "@lazyoft/jev-browser": "0.5.0-lazyoft.1"
+    "@typesafe-ai/sdk": "0.6.0",
+    "playwright": "1.63.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "24.13.6",
-    "playwright": "1.63.0",
     "typescript": "5.9.3"
-  },
-  "description": "Goal-driven browser exploration with Jev, compact evidence, and persistent supervisor handoff over MCP.",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lazyoft/jev-explorer.git"
-  },
-  "homepage": "https://github.com/lazyoft/jev-explorer#readme",
-  "bugs": {
-    "url": "https://github.com/lazyoft/jev-explorer/issues"
-  },
-  "bin": {
-    "jev-explorer": "bin/jev-explorer.mjs"
-  },
-  "files": [
-    "bin",
-    "dist",
-    "src",
-    "tsconfig.json",
-    "docs",
-    "README.md",
-    "LICENSE",
-    "NOTICE",
-    "SECURITY.md",
-    "packages/browser"
-  ],
-  "workspaces": [
-    "packages/browser"
-  ]
+  }
 }

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Request a quote</title></head>
+<body>
+  <h1>Request a quote</h1>
+  <form id="quote" onsubmit="event.preventDefault();document.getElementById('done').textContent='Your request was saved.'">
+    <label for="who">Your full name</label>
+    <input id="who" name="who" required>
+    <label for="day">Delivery day</label>
+    <input id="day" name="day" type="date">
+    <label for="news">Send me the newsletter</label>
+    <input id="news" name="news" type="checkbox">
+    <button type="submit">Save the request</button>
+  </form>
+  <p id="done"></p>
+</body></html>
