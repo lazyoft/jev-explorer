@@ -27,5 +27,15 @@
     "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "24.13.6",
     "typescript": "5.9.3"
-  }
+  },
+  "files": [
+    "dist",
+    "src",
+    "skills",
+    "test/pages",
+    "tsconfig.json",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ]
 }

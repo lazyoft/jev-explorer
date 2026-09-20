@@ -110,6 +110,17 @@ The status is one of five, and each one says what to do:
 | `blocked` | Sign in, solve a challenge, or give up. |
 | `spent` | Raise the budget, or narrow the goal. |
 
+## The skill
+
+`skills/jev-explorer/SKILL.md` teaches an agent how to use these four tools:
+what to send, what the five statuses mean, and how to carry a session on.
+
+Link it into your own skills folder:
+
+```sh
+ln -s "$PWD/skills/jev-explorer" ~/.claude/skills/jev-explorer
+```
+
 ## Tests
 
 ```sh
