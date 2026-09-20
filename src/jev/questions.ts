@@ -19,7 +19,10 @@ const actionChoice = (action: Action): Choice => ({
 
 const textChoice = (text: TextBlock): Choice => ({ id: text.ref, label: text.text, detail: { context: text.context } });
 
-const history = (session: Session) => session.steps.slice(-8).map(step => step.action);
+const history = (session: Session) => session.steps.slice(-8).map(step => `${step.action}: ${step.outcome}`);
+
+const valuesInHand = (session: Session) => Object.fromEntries(Object.entries(session.values)
+  .filter(([, value]) => !session.secrets.includes(value)));
 
 export function askNextAction(session: Session, actions: Action[], slice?: { number: number; count: number; allSeen: boolean }): Ask {
   const choices = actions.map(actionChoice);
@@ -31,7 +34,7 @@ export function askNextAction(session: Session, actions: Action[], slice?: { num
       goal: session.goal,
       page: { url: session.observation.url, title: session.observation.title },
       alreadyDone: history(session),
-      valuesInHand: Object.keys(session.values),
+      valuesInHand: valuesInHand(session),
       ...(slice ? { partOfPage: { number: slice.number, of: slice.count, wholePageSeen: slice.allSeen } } : {}),
     },
     question: 'Which one of these options moves toward the goal? Closing a pop-up, a banner or a cookie notice that covers the page also counts, because the page cannot be used until it is gone. Accept a cookie notice rather than refuse it, and take the single button that clears it rather than a panel of settings. Never sign in, subscribe, pay or agree to terms of service to get past something. Use what was already done, so the same step is not repeated. A missing option in this list is not proof that the website lacks it.',

@@ -54,6 +54,13 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     if (style.visibility === 'hidden' || style.opacity === '0') return false;
     return !node.closest('[inert], [aria-hidden="true"]');
   };
+  const hittable = (node: Element) => {
+    const box = node.getBoundingClientRect();
+    const x = Math.min(Math.max(box.left + box.width / 2, 0), window.innerWidth - 1);
+    const y = Math.min(Math.max(box.top + box.height / 2, 0), window.innerHeight - 1);
+    const onTop = node.ownerDocument.elementFromPoint(x, y);
+    return !!onTop && (node.contains(onTop) || onTop.contains(node));
+  };
   const zOrder = (node: Element) => {
     let top = 0;
     for (let current: Element | null = node; current; current = current.parentElement) {
@@ -121,7 +128,7 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
   const clickableRoles = ['button', 'link', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'gridcell', 'cell', 'treeitem', 'switch'];
   const found: { node: Element; z: number; action: Omit<RawAction, 'ref' | 'z'> }[] = [];
   for (const node of Array.from(document.querySelectorAll('*'))) {
-    if (!visible(node) || !onScreen(node) || disabled(node)) continue;
+    if (!visible(node) || !onScreen(node) || disabled(node) || !hittable(node)) continue;
     const role = explicitRole(node) || implicitRole(node);
     const editable = node instanceof HTMLElement && node.isContentEditable;
     let kind: RawAction['kind'] | '' = '';

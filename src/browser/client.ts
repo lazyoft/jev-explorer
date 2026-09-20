@@ -93,7 +93,12 @@ export async function perform(page: Page, action: Action, value?: string): Promi
       throw blocked('CLICK_BLOCKED', 'Something lying over the page caught the click. Look at the page again.');
     });
   }
-  else if (action.kind === 'type') await locator.fill(value ?? '', { timeout: ACTION_TIMEOUT });
+  else if (action.kind === 'type') {
+    const wanted = value ?? '';
+    await locator.fill('', { timeout: ACTION_TIMEOUT });
+    await locator.pressSequentially(wanted, { timeout: ACTION_TIMEOUT, delay: 30 });
+    if ((await readBack(page, action) ?? '').trim() !== wanted.trim()) await locator.fill(wanted, { timeout: ACTION_TIMEOUT });
+  }
   else if (action.kind === 'select') await locator.selectOption({ label: value ?? '' }, { timeout: ACTION_TIMEOUT });
   else if (action.kind === 'check') await locator.check({ timeout: ACTION_TIMEOUT });
   else if (action.kind === 'uncheck') await locator.uncheck({ timeout: ACTION_TIMEOUT });

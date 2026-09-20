@@ -107,6 +107,60 @@ test('it stops offering a step that changed nothing', async () => {
   } finally { await site.stop(); }
 });
 
+test('a choice the model is unsure of is refused when minConfidence asks for more', async () => {
+  const site = await startSite();
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') {
+      const careers = pick(ask, holds('link Careers'));
+      return careers ? { id: careers, confidence: 0.3 } : '__nothing__';
+    }
+    return undefined;
+  });
+  try {
+    const report = await run(decider, { url: site.url, goal: 'Open the careers page.', minConfidence: 0.8 });
+    assert.equal(report.status, 'needs_decision');
+    assert.match(report.need, /Careers/);
+    assert.match(report.need, /minConfidence/);
+    assert.equal(report.usage.steps, 0);
+  } finally { await site.stop(); }
+});
+
+test('the same unsure choice is taken when no minConfidence is sent', async () => {
+  const site = await startSite();
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') {
+      const careers = pick(ask, holds('link Careers'));
+      return careers ? { id: careers, confidence: 0.3 } : '__nothing__';
+    }
+    return undefined;
+  });
+  try {
+    const report = await run(decider, { url: site.url, goal: 'Open the careers page.' });
+    assert.equal(report.usage.steps, 1);
+    assert.match(report.page.url, /careers\.html$/);
+  } finally { await site.stop(); }
+});
+
+test('the run is told what each value is, and never a secret one', async () => {
+  const site = await startSite();
+  const states = [];
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') { states.push(ask.state.valuesInHand); return '__nothing__'; }
+    if (id.startsWith('bind_')) return '__none__';
+    return undefined;
+  });
+  try {
+    await run(decider, {
+      url: site.url,
+      goal: 'Look at the page.',
+      values: { travel_date: '2026-09-21', api_key: 'do-not-show-me' },
+    });
+    assert.ok(states.length > 0);
+    assert.equal(states[0].travel_date, '2026-09-21');
+    assert.equal(states[0].api_key, undefined);
+  } finally { await site.stop(); }
+});
+
 test('a page with more choices than the model allows is split into parts', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {

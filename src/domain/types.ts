@@ -53,6 +53,7 @@ export interface Budgets {
   maxSteps: number;
   maxMessages: number;
   timeoutMs: number;
+  minConfidence: number;
 }
 
 export interface Usage {

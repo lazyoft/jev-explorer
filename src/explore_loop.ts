@@ -4,7 +4,7 @@ import { sliceItems } from './jev/slices.js';
 import { askAnswers, askBindings, askNextAction, navigableActions, selectableFields, NEXT_SLICE, NONE, NOTHING, NOT_HERE, PREVIOUS_SLICE } from './jev/questions.js';
 import { ExplorerError, needsValue, spent } from './domain/errors.js';
 import { trace, saveObservation } from './domain/trace.js';
-import type { Action, Session } from './domain/types.js';
+import type { Action, Session, Step } from './domain/types.js';
 
 const CONFIDENT = 0.7;
 const ANSWER_CONFIDENT = 0.6;
@@ -30,6 +30,38 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   let staleRetries = 0;
   const unhelpful = new Set<string>();
   const answeredScreens = new Set<string>();
+  let unsure = '';
+  let lastStep: Step | null = null;
+  let seenBefore = new Set<string>();
+  let urlBefore = '';
+  let lastWasValue = false;
+  let lookBeforePlacing = false;
+
+  const take = (step: Step, placement = false) => {
+    seenBefore = new Set(session.observation.texts.map(text => text.text));
+    urlBefore = session.observation.url;
+    session.steps.push(step);
+    lastStep = step;
+    lastWasValue = placement;
+  };
+
+  const tellWhatChanged = () => {
+    if (!lastStep) return;
+    const step = lastStep;
+    lastStep = null;
+    if (session.observation.url !== urlBefore) return;
+    const fresh = session.observation.texts.map(text => text.text).filter(text => !seenBefore.has(text));
+    if (!fresh.length) return;
+    step.outcome += `, and the page now shows: ${fresh.join(' \u00b7 ').slice(0, 200)}`;
+    if (lastWasValue) lookBeforePlacing = true;
+  };
+
+  const forgetEmptiedFields = () => {
+    for (const [name, placement] of Object.entries(session.placed)) {
+      const field = selectableFields(session.observation).find(item => item.name === placement.name);
+      if (field && placement.value.trim() && !(field.value ?? '').trim()) delete session.placed[name];
+    }
+  };
 
   const ask = async (asks: Record<string, Ask>): Promise<Record<string, Answer>> => {
     if (session.usage.messages >= session.budgets.maxMessages) {
@@ -56,6 +88,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   };
 
   const placeOneValue = async (): Promise<boolean> => {
+    forgetEmptiedFields();
     const pending = Object.keys(session.values).filter(name => !session.placed[name]);
     if (!pending.length) return false;
     const taken = new Set(Object.values(session.placed).map(placement => placement.ref));
@@ -77,7 +110,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
         throw needsValue('VALUE_NOT_ACCEPTED', `The field "${field.name}" did not keep the value named "${name}". Check the value and send it again.`);
       }
       session.placed[name] = { ref: field.ref, name: field.name, value: wanted };
-      session.steps.push({ action: `put the value "${name}" into "${field.name}"`, outcome: 'the field kept the value' });
+      take({ action: `put the value "${name}" into "${field.name}"`, outcome: 'the field kept the value' }, true);
       session.usage.steps++;
       await trace(session, { kind: 'placed', value: name, field: field.name });
       return true;
@@ -88,6 +121,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   const markOf = (action: Action) => session.observation.url + '|' + action.ref + '|' + action.name;
 
   const chooseAction = async (): Promise<Action | null> => {
+    unsure = '';
     const bothPagingChoices = { number: 2, count: 3, allSeen: false };
     const offered = navigableActions(session.observation).filter(action => !unhelpful.has(markOf(action)));
     const slices = sliceItems(offered, group => ({ action: askNextAction(session, group, bothPagingChoices) }));
@@ -110,7 +144,13 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
         if (unseen >= 0) { index = unseen; continue; }
         return null;
       }
-      return group.find(item => item.ref === choice) ?? null;
+      const picked = group.find(item => item.ref === choice) ?? null;
+      if (picked && answers.action!.confidence < session.budgets.minConfidence) {
+        if (!askedAgain) { askedAgain = true; continue; }
+        unsure = picked.name;
+        return null;
+      }
+      return picked;
     }
   };
 
@@ -144,12 +184,14 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       if (Date.now() > deadline) throw spent('TIME_BUDGET', 'The run used all its time. Raise the budget or narrow the goal.');
 
       await read();
+      tellWhatChanged();
       if (await collectAnswers()) {
         session.status = 'answered';
         session.need = 'Read the findings and their source text.';
         return;
       }
-      if (await placeOneValue()) continue;
+      if (!lookBeforePlacing && await placeOneValue()) continue;
+      lookBeforePlacing = false;
 
       const action = await chooseAction();
       if (!action) {
@@ -161,7 +203,9 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
         const missing = session.observation.actions.find(item => item.required && item.filled === false);
         if (missing) throw needsValue('MISSING_VALUE', `The page asks for "${missing.name}" and no value was sent for it.`);
         session.status = 'needs_decision';
-        session.need = 'No offered step moves toward the goal, and the answer is not on this page. Look at the page and decide.';
+        session.need = unsure
+          ? `The best step the run could find was "${unsure}", and it was less sure of it than minConfidence asks for. Look at the page and decide, or send a lower minConfidence.`
+          : 'No offered step moves toward the goal, and the answer is not on this page. Look at the page and decide.';
         return;
       }
 
@@ -181,6 +225,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       } catch (error) {
         if (!(error instanceof ExplorerError) || !['STALE_CONTROL', 'CLICK_BLOCKED'].includes(error.code) || ++staleRetries > 3) throw error;
         await trace(session, { kind: 'retrying', action: label, code: (error as ExplorerError).code });
+        session.steps.push({ action: label, outcome: error.message });
         lastMark = '';
         await settle(session.page, 800);
         continue;
@@ -188,7 +233,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       await settle(session.page, 800);
       session.usage.steps++;
       await trace(session, { kind: 'acted', action: label });
-      session.steps.push({ action: label, outcome: 'done' });
+      take({ action: label, outcome: 'done' });
     }
   } finally {
     session.usage.elapsedMs = Date.now() - started;

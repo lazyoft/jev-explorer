@@ -35,7 +35,7 @@ export function scriptedDecider(rules) {
       for (const [id, ask] of Object.entries(asks)) {
         const chosen = rules(id, ask);
         if (chosen === undefined) throw new Error(`the test script has no answer for "${id}"`);
-        answers[id] = { id: chosen, confidence: 1 };
+        answers[id] = typeof chosen === 'string' ? { id: chosen, confidence: 1 } : chosen;
       }
       return { answers, inputTokens: 0, outputTokens: 0 };
     },

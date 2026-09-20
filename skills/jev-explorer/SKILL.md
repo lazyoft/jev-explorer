@@ -57,9 +57,42 @@ Rules that matter:
 - **Ask questions whose answers you do not know.** Each answer comes back as a
   block of text copied from the page, with its address. The model never writes
   an answer, so you can trust the quote.
-- **Send every value the site must receive** under `values`. The model cannot
-  invent text. A search term, a name, a city: all of these are values. Dates go
-  in as `2026-09-23`.
+- **Never ask for a list, and never ask by position.** An answer is one block of
+  text picked off the page, so "the first five headlines" has no block to point
+  at, and the run says the page does not hold the answer while the headlines sit
+  in front of it. Splitting it into "the first", "the second", "the third" fails
+  too: nothing inside a block says where it sits, so the model guesses and every
+  answer lands under the confidence floor and is thrown away. Both shapes come
+  back empty.
+
+  ```
+  wrong   [{ "key": "titles",  "question": "What are the first five headlines?" }]
+  wrong   [{ "key": "title1",  "question": "What is the first headline?" }, ...]
+
+  right   [{ "key": "price",   "question": "What does this room cost for one night?" },
+           { "key": "checkout","question": "By what time must the room be left?" }]
+  ```
+
+  A question must name one thing that the page itself names: a price, a date, a
+  telephone number, a score. **For a list, ask nothing.** Write a goal that only
+  reaches the page, then read the list yourself with `inspect`. That costs no
+  model call and gives you every row in the order the page shows them.
+- **Send every value the site must receive** under `values`, and **never write
+  that value in the goal text**. The model cannot invent text, so a word that
+  sits only in the goal is never typed anywhere. The run opens the search,
+  presses the button on an empty field, and wanders off into whatever it finds.
+  The goal names the field to fill; `values` carries what goes in it.
+
+  ```
+  wrong   "goal": "Search the site for Iran and read the first five headlines"
+
+  right   "goal": "Search the site and read the first five headlines",
+          "values": { "search": "Iran" }
+  ```
+
+  A search term, a name, a city: all of these are values. Dates go in as
+  `2026-09-23`. If you find yourself typing a proper noun, a number or a date
+  inside the goal, it belongs in `values` instead.
 - **Nothing stops a click.** The run presses whatever moves toward the goal,
   including save, send, buy, book and delete. Write a goal that stops before the
   button you do not want pressed, for example "fill the form and stop before

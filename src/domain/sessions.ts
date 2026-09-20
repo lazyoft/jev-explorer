@@ -5,7 +5,7 @@ import { launchBrowser } from '../browser/client.js';
 import { blocked } from './errors.js';
 import { emptyObservation, type Budgets, type Session } from './types.js';
 
-export const DEFAULT_BUDGETS: Budgets = { maxSteps: 25, maxMessages: 40, timeoutMs: 180000 };
+export const DEFAULT_BUDGETS: Budgets = { maxSteps: 25, maxMessages: 40, timeoutMs: 180000, minConfidence: 0 };
 
 export class SessionStore {
   private readonly sessions = new Map<string, Session>();

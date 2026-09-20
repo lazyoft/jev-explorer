@@ -23,6 +23,7 @@ const browseInput = z.object({
   maxSteps: z.number().int().min(1).max(60).optional(),
   maxMessages: z.number().int().min(1).max(120).optional(),
   timeoutMs: z.number().int().min(5000).max(600000).optional(),
+  minConfidence: z.number().min(0).max(1).optional(),
 }).refine(input => input.sessionId || input.url, 'Send a web address or the id of an open session.');
 
 export function createServer(store: SessionStore, decider: () => Decider) {

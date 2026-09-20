@@ -77,9 +77,23 @@ Every one of these came from a real run, not from reading the code.
 - Check the answers on each new screen, not on each new address. A scroll keeps
   the address and shows different text. Keyed on the address alone, the code read
   the Iran list once, scrolled eight times, and found nothing that was there.
+- An answer is one block of text, so two shapes of question can never be
+  answered. A question that asks for a list has no block to point at: "the first
+  five headlines" comes back as "this page does not hold the answer" while the
+  headlines sit on screen. Splitting it by position does not save it either,
+  because nothing inside a block says where it sits, so the model guesses and
+  every answer lands under the confidence floor and is dropped. A question names
+  one thing the page itself names. A list is read by the caller with `inspect`.
 - A click that something on top of the page catches is not a failure. Read the
   page again and choose again, the same way a control that vanished is handled.
   Left to throw, it killed the whole run.
+- Reading the page again is not enough after a caught click. The list of steps
+  already taken is all the model knows about the past, and a click that failed
+  was never written there. So the same question came back word for word and got
+  the same answer three times in a row, until the retries ran out. Write the
+  failed click into the steps with its outcome, and carry the outcome into that
+  list, not the action alone. On repubblica.it this alone turned a run that took
+  zero steps into one that accepted the banner by itself on the third try.
 - Follow a tab opened by a link, and offer to close it. A new tab has no history,
   so the go-back option never appears there.
 - A control that vanished before the click was never clicked, so read the page

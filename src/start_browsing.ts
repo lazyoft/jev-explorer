@@ -19,6 +19,7 @@ export interface BrowseRequest {
   maxSteps?: number | undefined;
   maxMessages?: number | undefined;
   timeoutMs?: number | undefined;
+  minConfidence?: number | undefined;
 }
 
 const SECRET = /pass|secret|token|api.?key|credential/i;
@@ -58,8 +59,8 @@ function applyRequest(session: Session, request: BrowseRequest) {
     session.steps = [];
   }
   for (const [name, value] of Object.entries(request.values ?? {})) {
+    if (session.values[name] !== value) delete session.placed[name];
     session.values[name] = value;
-    delete session.placed[name];
     if (SECRET.test(name)) session.secrets.push(value);
   }
   if (request.note) session.notes.push(request.note);
@@ -67,6 +68,7 @@ function applyRequest(session: Session, request: BrowseRequest) {
     maxSteps: request.maxSteps ?? DEFAULT_BUDGETS.maxSteps,
     maxMessages: request.maxMessages ?? DEFAULT_BUDGETS.maxMessages,
     timeoutMs: request.timeoutMs ?? DEFAULT_BUDGETS.timeoutMs,
+    minConfidence: request.minConfidence ?? DEFAULT_BUDGETS.minConfidence,
   };
   session.usage = { steps: 0, messages: 0, inputTokens: 0, outputTokens: 0, elapsedMs: 0 };
   session.need = '';
