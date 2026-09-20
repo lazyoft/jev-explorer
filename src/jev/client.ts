@@ -25,7 +25,8 @@ const wire = z.object({
   usage: z.object({ input_tokens: z.number(), output_tokens: z.number() }).optional(),
 });
 
-export const MAX_REQUEST_BYTES = 120 * 1024;
+export const MAX_REQUEST_BYTES = 48 * 1024;
+export const MAX_CHOICES = 250;
 
 export function buildRequest(asks: Record<string, Ask>) {
   const state: Record<string, unknown> = {};
@@ -60,15 +61,19 @@ export class JevDecider implements Decider {
   async ask(asks: Record<string, Ask>, signal: AbortSignal) {
     signal.throwIfAborted();
     const request = buildRequest(asks);
-    if (Buffer.byteLength(JSON.stringify(request), 'utf8') > MAX_REQUEST_BYTES) {
-      throw blocked('PAGE_TOO_LARGE', 'This page does not fit in one question. Narrow the goal or start from a smaller page.');
+    const size = Buffer.byteLength(JSON.stringify(request), 'utf8');
+    const widest = Math.max(...Object.values(asks).map(ask => ask.choices.length));
+    if (size > MAX_REQUEST_BYTES || widest > MAX_CHOICES) {
+      throw blocked('PAGE_TOO_LARGE', `This page does not fit in one question (${Object.keys(asks).join(', ')}: ${size} bytes, ${widest} choices). Narrow the goal or start from a smaller page.`);
     }
     let raw: unknown;
     try {
       raw = await this.client.systemOne(request as Parameters<TypeSafeClient['systemOne']>[0], { signal, retry: { maxRetries: 0 } });
     } catch (error) {
       if (signal.aborted) throw blocked('CANCELLED', 'The run was cancelled.');
-      throw blocked('MODEL_FAILED', 'The model did not answer. No browser action was repeated.');
+      const status = typeof error === 'object' && error !== null && 'status' in error ? String(error.status) : '';
+      const reason = error instanceof Error ? error.message.slice(0, 200) : '';
+      throw blocked('MODEL_FAILED', `The model did not answer${status ? ' (HTTP ' + status + ')' : ''}. No browser action was repeated. ${reason}`.trim());
     }
     const parsed = wire.safeParse(raw);
     if (!parsed.success) throw blocked('BAD_ANSWER', 'The model returned an answer that could not be read.');

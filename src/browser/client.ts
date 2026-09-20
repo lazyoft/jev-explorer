@@ -44,7 +44,9 @@ export async function readObservation(page: Page): Promise<Observation> {
     const canGoBack = await main.evaluate(() => history.length > 1).catch(() => false);
     if (canGoBack) actions.push({ ref: 'back', kind: 'back', role: 'page', name: 'go back to the previous page', context: '', frame: 0 });
   }
-  return { url: page.url(), title: await page.title().catch(() => ''), busy, actions, texts };
+  const title = await page.title().catch(() => '');
+  if (title) texts.unshift({ ref: 'title', role: 'title', text: title, context: page.url(), frame: 0 });
+  return { url: page.url(), title, busy, actions, texts };
 }
 
 function locate(page: Page, action: Action): Locator {

@@ -112,3 +112,23 @@ test('it stops when the same step repeats with no change', async () => {
     assert.match(report.need, /twice/);
   } finally { await site.stop(); }
 });
+
+test('a page with more choices than the model allows is split into parts', async () => {
+  const site = await startSite();
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') return '__nothing__';
+    if (id.startsWith('answer_')) return pick(ask, label => label.includes('QX-7781')) ?? '__not_here__';
+    return undefined;
+  });
+  try {
+    const report = await run(decider, {
+      url: site.url + '/many.html',
+      goal: 'Find the reference code.',
+      questions: [{ key: 'code', question: 'What is the reference code?' }],
+    });
+    const widest = Math.max(...decider.seen.flatMap(asks => Object.values(asks).map(ask => ask.choices.length)));
+    assert.ok(widest <= 255, `one question offered ${widest} choices`);
+    assert.equal(report.status, 'answered');
+    assert.match(report.findings[0].answer, /QX-7781/);
+  } finally { await site.stop(); }
+});

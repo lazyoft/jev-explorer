@@ -133,7 +133,6 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     });
   }
 
-  const labels = new Set(actions.map(action => action.name));
   const blockTags = ['P', 'LI', 'TD', 'TH', 'DD', 'DT', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'FIGCAPTION', 'OUTPUT', 'SPAN', 'DIV', 'ADDRESS', 'TIME', 'STRONG', 'EM', 'LABEL'];
   const texts: RawText[] = [];
   const seen = new Set<string>();
@@ -142,7 +141,7 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     if (!visible(node)) continue;
     if (node.querySelector(blockTags.join(','))) continue;
     const body = text(node);
-    if (!body || body.length > 600 || labels.has(body) || seen.has(body)) continue;
+    if (!body || body.length > 600 || seen.has(body)) continue;
     seen.add(body);
     const role = explicitRole(node) || (/^H[1-6]$/.test(node.tagName) ? 'heading' : 'text');
     texts.push({ ref: 't' + texts.length, role, text: body, context: context(node) });

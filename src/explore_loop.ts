@@ -1,14 +1,14 @@
 import { perform, readBack, readObservation, settle } from './browser/client.js';
 import { buildRequest, type Ask, type Answer, type Decider } from './jev/client.js';
-import { sliceActions } from './jev/slices.js';
-import { askAnswers, askBindings, askEffect, askNextAction, selectableFields, NEXT_SLICE, NONE, NOTHING, NOT_HERE, PREVIOUS_SLICE } from './jev/questions.js';
+import { sliceItems } from './jev/slices.js';
+import { askAnswers, askBindings, askEffect, askNextAction, navigableActions, selectableFields, NEXT_SLICE, NONE, NOTHING, NOT_HERE, PREVIOUS_SLICE } from './jev/questions.js';
 import { blocked, needsDecision, needsValue, spent } from './domain/errors.js';
 import { trace, saveObservation } from './domain/trace.js';
 import type { Action, Effect, Session } from './domain/types.js';
 
 const CONFIDENT = 0.7;
 const ANSWER_CONFIDENT = 0.6;
-const TEXT_LIMIT = 120;
+const TEXT_LIMIT = 250;
 
 function formatValue(value: string, field: Action): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -81,7 +81,8 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   };
 
   const chooseAction = async (): Promise<Action | null> => {
-    const slices = sliceActions(session.observation.actions, group => askNextAction(session, group));
+    const bothPagingChoices = { number: 2, count: 3, allSeen: false };
+    const slices = sliceItems(navigableActions(session.observation), group => ({ action: askNextAction(session, group, bothPagingChoices) }));
     const seen = new Set<number>();
     let index = 0;
     for (;;) {
@@ -104,16 +105,20 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
     if (!session.questions.length) return false;
     const texts = session.observation.texts.slice(0, TEXT_LIMIT);
     if (!texts.length) return false;
-    const answers = await ask(askAnswers(session, texts));
-    for (const item of session.questions) {
-      const answer = answers['answer_' + item.key];
-      if (!answer || answer.id === NOT_HERE || answer.confidence < ANSWER_CONFIDENT) continue;
-      const block = texts.find(text => text.ref === answer.id);
-      if (!block) continue;
-      session.findings = session.findings.filter(finding => finding.key !== item.key);
-      session.findings.push({ key: item.key, question: item.question, text: block.text, context: block.context, url: session.observation.url });
+    const unanswered = () => session.questions.filter(item => !session.findings.some(finding => finding.key === item.key));
+    for (const group of sliceItems(texts, part => askAnswers(session, part, unanswered()))) {
+      const remaining = unanswered();
+      if (!remaining.length) break;
+      const answers = await ask(askAnswers(session, group, remaining));
+      for (const item of remaining) {
+        const answer = answers['answer_' + item.key];
+        if (!answer || answer.id === NOT_HERE || answer.confidence < ANSWER_CONFIDENT) continue;
+        const block = group.find(text => text.ref === answer.id);
+        if (!block) continue;
+        session.findings.push({ key: item.key, question: item.question, text: block.text, context: block.context, url: session.observation.url });
+      }
     }
-    return session.questions.every(item => session.findings.some(finding => finding.key === item.key));
+    return !unanswered().length;
   };
 
   try {

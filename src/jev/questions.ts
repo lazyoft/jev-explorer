@@ -68,10 +68,10 @@ export function askBindings(session: Session, pending: string[], fields: Action[
   return asks;
 }
 
-export function askAnswers(session: Session, texts: TextBlock[]): Record<string, Ask> {
+export function askAnswers(session: Session, texts: TextBlock[], questions: Session['questions']): Record<string, Ask> {
   const choices = [...texts.map(textChoice), { id: NOT_HERE, label: 'this page does not hold the answer' }];
   const asks: Record<string, Ask> = {};
-  for (const item of session.questions) {
+  for (const item of questions) {
     asks['answer_' + item.key] = {
       state: { goal: session.goal, page: { url: session.observation.url, title: session.observation.title } },
       question: `Which one of these text blocks answers this question: "${item.question}"? Choose the block that holds the answer itself, not its label. Choose "not here" rather than a block that only looks similar.`,
@@ -83,4 +83,8 @@ export function askAnswers(session: Session, texts: TextBlock[]): Record<string,
 
 export function selectableFields(observation: Observation): Action[] {
   return observation.actions.filter(action => ['type', 'select', 'check'].includes(action.kind));
+}
+
+export function navigableActions(observation: Observation): Action[] {
+  return observation.actions.filter(action => ['click', 'scroll', 'back'].includes(action.kind));
 }

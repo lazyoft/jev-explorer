@@ -1,18 +1,19 @@
-import { buildRequest, MAX_REQUEST_BYTES, type Ask } from './client.js';
-import type { Action } from '../domain/types.js';
+import { buildRequest, MAX_CHOICES, MAX_REQUEST_BYTES, type Ask } from './client.js';
 
-const bytes = (ask: Ask) => Buffer.byteLength(JSON.stringify(buildRequest({ probe: ask })), 'utf8');
+const fits = (asks: Record<string, Ask>) =>
+  Buffer.byteLength(JSON.stringify(buildRequest(asks)), 'utf8') <= MAX_REQUEST_BYTES
+  && Object.values(asks).every(ask => ask.choices.length <= MAX_CHOICES);
 
-export function sliceActions(actions: Action[], build: (actions: Action[]) => Ask): Action[][] {
-  if (!actions.length) return [[]];
-  if (bytes(build(actions)) <= MAX_REQUEST_BYTES) return [actions];
-  const slices: Action[][] = [];
-  let current: Action[] = [];
-  for (const action of actions) {
-    const candidate = [...current, action];
-    if (current.length && bytes(build(candidate)) > MAX_REQUEST_BYTES) {
+export function sliceItems<T>(items: T[], build: (items: T[]) => Record<string, Ask>): T[][] {
+  if (!items.length) return [[]];
+  if (fits(build(items))) return [items];
+  const slices: T[][] = [];
+  let current: T[] = [];
+  for (const item of items) {
+    const candidate = [...current, item];
+    if (current.length && !fits(build(candidate))) {
       slices.push(current);
-      current = [action];
+      current = [item];
     } else current = candidate;
   }
   if (current.length) slices.push(current);
