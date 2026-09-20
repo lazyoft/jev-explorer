@@ -37,12 +37,13 @@ export async function readObservation(page: Page): Promise<Observation> {
     busy ||= raw.busy;
     for (const item of raw.actions) actions.push({ ...item, ref: index + ':' + item.ref, frame: index });
     for (const item of raw.texts) texts.push({ ...item, ref: index + ':' + item.ref, frame: index });
-    if (index === 0 && raw.scrollable) actions.push({ ref: 'scroll', kind: 'scroll', role: 'page', name: 'scroll further down this page', context: '', frame: 0 });
+    if (index === 0 && raw.scrollable) actions.push({ ref: 'scroll', kind: 'scroll', onScreen: true, role: 'page', name: 'scroll further down this page', context: '', frame: 0 });
+    if (index === 0 && raw.scrollableUp) actions.push({ ref: 'scroll-up', kind: 'scroll', onScreen: true, role: 'page', name: 'scroll back up this page', context: '', frame: 0 });
   }
   const main = frames[0];
   if (main && page.url() !== 'about:blank') {
     const canGoBack = await main.evaluate(() => history.length > 1).catch(() => false);
-    if (canGoBack) actions.push({ ref: 'back', kind: 'back', role: 'page', name: 'go back to the previous page', context: '', frame: 0 });
+    if (canGoBack) actions.push({ ref: 'back', kind: 'back', onScreen: true, role: 'page', name: 'go back to the previous page', context: '', frame: 0 });
   }
   const title = await page.title().catch(() => '');
   if (title) texts.unshift({ ref: 'title', role: 'title', text: title, context: page.url(), frame: 0 });
@@ -57,7 +58,7 @@ function locate(page: Page, action: Action): Locator {
 }
 
 export async function perform(page: Page, action: Action, value?: string): Promise<void> {
-  if (action.kind === 'scroll') { await page.mouse.wheel(0, 700); return; }
+  if (action.kind === 'scroll') { await page.mouse.wheel(0, action.ref === 'scroll-up' ? -700 : 700); return; }
   if (action.kind === 'back') { await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {}); return; }
   const locator = locate(page, action);
   if (await locator.count() !== 1) throw blocked('STALE_CONTROL', 'The chosen control is no longer on the page. Look at the page again.');

@@ -132,3 +132,22 @@ test('a page with more choices than the model allows is split into parts', async
     assert.match(report.findings[0].answer, /QX-7781/);
   } finally { await site.stop(); }
 });
+
+test('a control far below the fold is offered only after scrolling', async () => {
+  const site = await startSite();
+  const labels = [];
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') {
+      labels.push(ask.choices.map(choice => choice.label));
+      return pick(ask, holds('Buried link')) ?? pick(ask, holds('scroll further down')) ?? '__nothing__';
+    }
+    if (id === 'effect') return 'move';
+    if (id.startsWith('answer_')) return '__not_here__';
+    return undefined;
+  });
+  try {
+    await run(decider, { url: site.url + '/tall.html', goal: 'Open the buried link.' });
+    assert.ok(!labels[0].some(label => label.includes('Buried link')), 'the buried link was offered before scrolling');
+    assert.ok(labels.some(list => list.some(label => label.includes('Buried link'))), 'the buried link was never offered');
+  } finally { await site.stop(); }
+});

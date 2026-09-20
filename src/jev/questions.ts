@@ -86,5 +86,5 @@ export function selectableFields(observation: Observation): Action[] {
 }
 
 export function navigableActions(observation: Observation): Action[] {
-  return observation.actions.filter(action => ['click', 'scroll', 'back'].includes(action.kind));
+  return observation.actions.filter(action => ['click', 'scroll', 'back'].includes(action.kind) && action.onScreen !== false);
 }

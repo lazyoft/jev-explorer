@@ -1,5 +1,6 @@
 export interface RawAction {
   ref: string;
+  onScreen: boolean;
   kind: 'click' | 'type' | 'select' | 'check';
   role: string;
   name: string;
@@ -27,12 +28,15 @@ export interface RawPage {
   actions: RawAction[];
   texts: RawText[];
   scrollable: boolean;
+  scrollableUp: boolean;
 }
 
 export function readPage(limits: { actions: number; texts: number }): RawPage {
   const attribute = 'data-jev-ref';
   for (const stale of Array.from(document.querySelectorAll('[' + attribute + ']'))) stale.removeAttribute(attribute);
 
+  const onScreen = (node: Element) => Array.from(node.getClientRects()).some(rect =>
+    rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth);
   const visible = (node: Element) => {
     if (!node.getClientRects().length) return false;
     const style = getComputedStyle(node);
@@ -120,7 +124,7 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
       : node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement ? input.value
       : editable ? text(node) : '';
     actions.push({
-      ref, kind, role: role || 'generic', name: name.slice(0, 200), context: context(node),
+      ref, kind, onScreen: onScreen(node), role: role || 'generic', name: name.slice(0, 200), context: context(node),
       value: value.slice(0, 200),
       ...(kind === 'check' ? { checked: node instanceof HTMLInputElement ? node.checked : node.getAttribute('aria-checked') === 'true' } : {}),
       required: node.hasAttribute('required') || node.getAttribute('aria-required') === 'true',
@@ -153,5 +157,6 @@ export function readPage(limits: { actions: number; texts: number }): RawPage {
     busy: document.readyState !== 'complete' || !!document.querySelector('[aria-busy="true"], [role="progressbar"]'),
     actions, texts,
     scrollable: window.scrollY + window.innerHeight < document.documentElement.scrollHeight - 40,
+    scrollableUp: window.scrollY > 40,
   };
 }

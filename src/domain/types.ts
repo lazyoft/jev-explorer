@@ -5,6 +5,7 @@ export type ActionKind = 'click' | 'type' | 'select' | 'check' | 'uncheck' | 'sc
 
 export interface Action {
   ref: string;
+  onScreen?: boolean;
   kind: ActionKind;
   role: string;
   name: string;
