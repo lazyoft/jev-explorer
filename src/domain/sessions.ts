@@ -39,6 +39,14 @@ export class SessionStore {
       observation: emptyObservation(),
       artifacts: { trace: join(dir, 'trace.jsonl'), observation: join(dir, 'page.json'), screenshot: join(dir, 'page.png') },
     };
+    context.on('page', opened => {
+      opened.on('dialog', dialog => void dialog.dismiss().catch(() => {}));
+      opened.on('close', () => {
+        const open = context.pages().filter(other => !other.isClosed());
+        session.page = open[open.length - 1] ?? session.page;
+      });
+      session.page = opened;
+    });
     this.sessions.set(id, session);
     return session;
   }

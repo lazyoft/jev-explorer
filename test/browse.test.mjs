@@ -151,3 +151,22 @@ test('a control far below the fold is offered only after scrolling', async () =>
     assert.ok(labels.some(list => list.some(label => label.includes('Buried link'))), 'the buried link was never offered');
   } finally { await site.stop(); }
 });
+
+test('it follows a link that opens a new tab', async () => {
+  const site = await startSite();
+  const decider = scriptedDecider((id, ask) => {
+    if (id === 'action') return pick(ask, holds('new tab')) ?? '__nothing__';
+    if (id === 'effect') return 'move';
+    if (id.startsWith('answer_')) return pick(ask, label => label.includes('+39')) ?? '__not_here__';
+    return undefined;
+  });
+  try {
+    const report = await run(decider, {
+      url: site.url + '/newtab.html',
+      goal: 'Find the workshop phone number.',
+      questions: [{ key: 'phone', question: 'What is the workshop phone number?' }],
+    });
+    assert.equal(report.status, 'answered');
+    assert.match(report.findings[0].source.url, /contact\.html$/);
+  } finally { await site.stop(); }
+});
