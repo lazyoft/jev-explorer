@@ -8,6 +8,7 @@ import type { Action, Effect, Session } from './domain/types.js';
 
 const CONFIDENT = 0.7;
 const ANSWER_CONFIDENT = 0.6;
+const GIVING_UP_CONFIDENT = 0.5;
 const TEXT_LIMIT = 250;
 
 function formatValue(value: string, field: Action): string {
@@ -28,6 +29,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   let lastMark = '';
   let staleRetries = 0;
   const unhelpful = new Set<string>();
+  const readAnswersOn = new Set<string>();
 
   const ask = async (asks: Record<string, Ask>): Promise<Record<string, Answer>> => {
     if (session.usage.messages >= session.budgets.maxMessages) {
@@ -91,11 +93,16 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
     const slices = sliceItems(offered, group => ({ action: askNextAction(session, group, bothPagingChoices) }));
     const seen = new Set<number>();
     let index = 0;
+    let askedAgain = false;
     for (;;) {
       seen.add(index);
       const group = slices[index] ?? [];
       const answers = await ask({ action: askNextAction(session, group, { number: index + 1, count: slices.length, allSeen: seen.size === slices.length }) });
       const choice = answers.action!.id;
+      if (choice === NOTHING && answers.action!.confidence < GIVING_UP_CONFIDENT && !askedAgain) {
+        askedAgain = true;
+        continue;
+      }
       if (choice === NEXT_SLICE && index + 1 < slices.length) { index++; continue; }
       if (choice === PREVIOUS_SLICE && index > 0) { index--; continue; }
       if (choice === NOTHING || choice === NEXT_SLICE || choice === PREVIOUS_SLICE) {
@@ -108,7 +115,8 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
   };
 
   const collectAnswers = async (): Promise<boolean> => {
-    if (!session.questions.length) return false;
+    if (!session.questions.length || readAnswersOn.has(session.observation.url)) return false;
+    readAnswersOn.add(session.observation.url);
     const texts = session.observation.texts.slice(0, TEXT_LIMIT);
     if (!texts.length) return false;
     const unanswered = () => session.questions.filter(item => !session.findings.some(finding => finding.key === item.key));
@@ -134,6 +142,11 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       if (Date.now() > deadline) throw spent('TIME_BUDGET', 'The run used all its time. Raise the budget or narrow the goal.');
 
       await read();
+      if (await collectAnswers()) {
+        session.status = 'answered';
+        session.need = 'Read the findings and their source text.';
+        return;
+      }
       if (await placeOneValue()) continue;
 
       const action = await chooseAction();

@@ -85,7 +85,7 @@ test('it waits for a slow page without asking the model', async () => {
     });
     assert.equal(report.status, 'answered');
     assert.match(report.findings[0].answer, /09:00/);
-    assert.equal(decider.seen.length, 2);
+    assert.equal(decider.seen.length, 1);
   } finally { await site.stop(); }
 });
 
