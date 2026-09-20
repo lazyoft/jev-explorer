@@ -22,23 +22,21 @@ question: one fixed sentence, written by hand
 options:  a numbered list, built from the page
 ```
 
-There are four question sentences in the whole system, and they live in one file,
-`src/jev/questions.ts`:
+There are three question sentences in the whole system, and they live in one
+file, `src/jev/questions.ts`:
 
 1. Which of these options moves toward the goal?
-2. What does this one action do: move, change, or commit?
-3. Which field should receive the value named X?
-4. Which of these text blocks answers this question?
+2. Which field should receive the value named X?
+3. Which of these text blocks answers this question?
 
 Nothing else is ever asked. A question about a calendar would force a question
 about every widget on earth, so there is none.
 
 ## What one step costs
 
-One step of exploration sends two messages: one to choose the action, one small
-one to check what that action does. A step that only fills a field sends one.
+One step of exploration sends one message: the question that chooses the action.
 
-A test asserts this. If a change makes a step cost three messages, the test fails.
+A test asserts this. If a change makes a step cost two messages, the test fails.
 
 ## Findings
 
@@ -48,10 +46,9 @@ evidence can be trusted.
 
 ## Safety
 
-- An action that saves, sends, buys, books or deletes runs only when the caller
-  sets `allowCommit`. Then the run stops, and the caller must confirm what
-  happened before anything else is done.
-- Nothing is ever repeated automatically after such an action.
+- Nothing stops a click. The run presses whatever moves toward the goal,
+  including save, send, buy, book and delete. The goal is the only brake, so
+  write one that stops before the button you do not want pressed.
 - The model never supplies a selector, and no tool runs code on the page.
 - Values whose name looks like a password or a token are removed from the trace.
 
@@ -106,7 +103,7 @@ The status is one of five, and each one says what to do:
 | --- | --- |
 | `answered` | Read the findings. |
 | `needs_value` | Send the missing value. |
-| `needs_decision` | Confirm a commit, or take over. |
+| `needs_decision` | Take over: no offered step moves toward the goal. |
 | `blocked` | Sign in, solve a challenge, or give up. |
 | `spent` | Raise the budget, or narrow the goal. |
 

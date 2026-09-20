@@ -28,20 +28,32 @@ skills/jev-explorer/    the skill that teaches an agent to use the tools
 
 ## Rules that must not be broken
 
-1. **Four question shapes.** Next action, effect of the chosen action, field
-   binding, answer source. They live in `src/jev/questions.ts`. A fifth shape
-   must be argued for, not added quietly. A question about a named website
-   feature, such as a calendar, forces a question for every feature on earth.
-2. **Two messages for each step.** One to choose the action, one small one to
-   check what that action does. A test asserts the count and fails if it grows.
+1. **Three question shapes.** Next action, field binding, answer source. They
+   live in `src/jev/questions.ts`. A fourth shape must be argued for, not added
+   quietly. A question about a named website feature, such as a calendar, forces
+   a question for every feature on earth.
+2. **One message for each step.** The question that chooses the action, and
+   nothing else. A test asserts the count and fails if it grows.
 3. **The model never writes text.** Every value typed into a page comes from the
    caller. Every finding is a block of text copied from the page, word for word.
 4. **The model never supplies a selector**, and no tool runs code on a page.
-5. **An action that acts outside the page** runs only with `allowCommit`, and the
-   run then stops and waits for the caller to confirm what happened. Nothing is
-   ever repeated automatically after such an action.
-6. **The effect question asks about the chosen action only.** Never about the
-   options that were not chosen.
+5. **Nothing stands between the run and a button.** There is no brake. A run
+   clicks whatever moves toward the goal, including save, send, buy, book and
+   delete. The caller carries that risk and must write a goal that stops short of
+   those. This was weighed and chosen: the check cost a model call on every step
+   and called a cookie button a purchase.
+6. **Build, then reconnect the server, every time.** The MCP server reads the
+   built code into memory when it starts and keeps that copy until it stops. A
+   rebuild never reaches a server that is already running, so the tools go on
+   using the old code and a finished fix looks as if it failed. This has already
+   cost a whole debugging session twice. Reconnecting is not enough on its own:
+   a reconnect to a server that is still alive reattaches to the same process,
+   which still holds the old code. Only a dead process is replaced. So after a
+   change: `npm run build`, then kill the server process, then `/mcp reconnect
+   all`. Check the result. The new process must be younger than the files in
+   `dist`, and while it is down the four tools disappear from the session. The
+   same trap catches the editor: the TypeScript server also holds an old view of
+   the files, so trust `npx tsc --noEmit` over the red marks on screen.
 
 ## Things learned from live websites
 
@@ -76,7 +88,7 @@ Every one of these came from a real run, not from reading the code.
 
 ```sh
 npm run check      # build, then the twelve local tests. No key, no cost.
-npm run build      # the MCP server runs the built code, so build after a change
+npm run build      # then reconnect the server with /mcp, or it keeps the old code
 npm run test:live  # the real model against the local pages. Needs TYPESAFE_API_KEY.
 ```
 
@@ -91,6 +103,8 @@ runs out, and read `trace.jsonl` in the session folder before running again.
 - The server is registered with Claude Code at user scope, running
   `node --env-file-if-exists=<repo>/.env <repo>/dist/mcp/main.js`.
 - The API key is in `.env` in this folder. Git ignores it.
+- A `pre-commit` hook runs `npm run build`, so a commit never leaves `dist`
+  behind the source. The hook cannot reconnect the running server. Only `/mcp` does.
 - `~/.claude/skills/jev-explorer` is a link to `skills/jev-explorer`.
 
 ## Known limits

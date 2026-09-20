@@ -31,11 +31,11 @@ export class SessionStore {
     const session: Session = {
       id, dir, browser, context, page,
       busy: false, closed: false, touched: Date.now(),
-      goal: '', questions: [], values: {}, placed: {}, commitAllowed: false,
+      goal: '', questions: [], values: {}, placed: {},
       budgets: { ...DEFAULT_BUDGETS },
       usage: { steps: 0, messages: 0, inputTokens: 0, outputTokens: 0, elapsedMs: 0 },
       status: 'needs_decision', need: 'The browser is open. Send a goal.',
-      steps: [], findings: [], notes: [], secrets: [], awaitingCommit: false,
+      steps: [], findings: [], notes: [], secrets: [],
       observation: emptyObservation(),
       artifacts: { trace: join(dir, 'trace.jsonl'), observation: join(dir, 'page.json'), screenshot: join(dir, 'page.png') },
     };

@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { goto } from './browser/client.js';
 import { exploreLoop } from './explore_loop.js';
 import { DEFAULT_BUDGETS, type SessionStore } from './domain/sessions.js';
-import { ExplorerError, blocked, needsDecision } from './domain/errors.js';
+import { ExplorerError, blocked } from './domain/errors.js';
 import { buildReport, type Report } from './domain/report.js';
 import { trace } from './domain/trace.js';
 import type { Decider } from './jev/client.js';
@@ -15,8 +15,6 @@ export interface BrowseRequest {
   goal: string;
   questions?: { key: string; question: string }[] | undefined;
   values?: Record<string, string> | undefined;
-  allowCommit?: boolean | undefined;
-  confirm?: 'done' | 'not_done' | undefined;
   note?: string | undefined;
   maxSteps?: number | undefined;
   maxMessages?: number | undefined;
@@ -35,7 +33,6 @@ export async function startBrowsing(store: SessionStore, decider: Decider, reque
     catch (error) { await store.close(created.id).catch(() => {}); throw error; }
   }
   return store.exclusive(sessionId, async session => {
-    resolveCommit(session, request);
     applyRequest(session, request);
     await trace(session, { kind: 'goal', goal: session.goal, values: Object.keys(session.values) });
     try {
@@ -48,19 +45,6 @@ export async function startBrowsing(store: SessionStore, decider: Decider, reque
     }
     await writeFile(session.artifacts.screenshot, await session.page.screenshot({ fullPage: false }), { mode: 0o600 }).catch(() => {});
     return buildReport(session);
-  });
-}
-
-function resolveCommit(session: Session, request: BrowseRequest) {
-  if (!session.awaitingCommit) return;
-  if (!request.confirm) {
-    throw needsDecision('CONFIRM_FIRST', 'The last step may have changed something outside the page. Say whether it happened before this session continues.');
-  }
-  session.awaitingCommit = false;
-  session.steps.push({
-    action: 'the supervisor checked the last step',
-    effect: 'commit',
-    outcome: request.confirm === 'done' ? 'it happened' : 'it did not happen',
   });
 }
 
@@ -79,7 +63,6 @@ function applyRequest(session: Session, request: BrowseRequest) {
     if (SECRET.test(name)) session.secrets.push(value);
   }
   if (request.note) session.notes.push(request.note);
-  session.commitAllowed = request.allowCommit ?? false;
   session.budgets = {
     maxSteps: request.maxSteps ?? DEFAULT_BUDGETS.maxSteps,
     maxMessages: request.maxMessages ?? DEFAULT_BUDGETS.maxMessages,

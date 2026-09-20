@@ -46,11 +46,8 @@ export interface Finding {
 
 export interface Step {
   action: string;
-  effect: Effect;
   outcome: string;
 }
-
-export type Effect = 'move' | 'change' | 'commit';
 
 export interface Budgets {
   maxSteps: number;
@@ -79,7 +76,6 @@ export interface Session {
   questions: { key: string; question: string }[];
   values: Record<string, string>;
   placed: Record<string, { ref: string; name: string; value: string }>;
-  commitAllowed: boolean;
   budgets: Budgets;
   usage: Usage;
   status: Stop;
@@ -88,7 +84,6 @@ export interface Session {
   findings: Finding[];
   notes: string[];
   secrets: string[];
-  awaitingCommit: boolean;
   observation: Observation;
   artifacts: { trace: string; observation: string; screenshot: string };
 }

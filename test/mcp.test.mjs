@@ -11,7 +11,6 @@ const holds = (needle) => (label) => label.toLowerCase().includes(needle.toLower
 test('the four tools work over the real protocol', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
-    if (id === 'effect') return 'move';
     if (id === 'action') return pick(ask, holds('Reject optional')) ?? pick(ask, holds('link Contact')) ?? '__nothing__';
     if (id.startsWith('answer_')) return pick(ask, label => label.includes('+39')) ?? '__not_here__';
     return undefined;

@@ -19,8 +19,6 @@ const browseInput = z.object({
   goal: z.string().min(1).max(4000).optional(),
   questions: z.array(z.object({ key: name, question: z.string().min(1).max(600) })).max(8).default([]),
   values: z.record(name, z.string().max(2000)).default({}),
-  allowCommit: z.boolean().default(false),
-  confirm: z.enum(['done', 'not_done']).optional(),
   note: z.string().max(2000).optional(),
   maxSteps: z.number().int().min(1).max(60).optional(),
   maxMessages: z.number().int().min(1).max(120).optional(),
@@ -55,7 +53,7 @@ export function createServer(store: SessionStore, decider: () => Decider) {
     });
 
   add('browse',
-    'Give a browser goal in plain words and get back the findings with the exact source text. Send questions whose answers you do not know. The browser stays open, so you can add a missing value and call browse again with the same sessionId. Send a url without a goal only to open a browser for a manual sign-in. Nothing that saves, sends, buys or deletes happens unless allowCommit is true, and it always stops for your confirmation afterwards.',
+    'Give a browser goal in plain words and get back the findings with the exact source text. Send questions whose answers you do not know. The browser stays open, so you can add a missing value and call browse again with the same sessionId. Send a url without a goal only to open a browser for a manual sign-in. The run clicks whatever moves toward the goal, including buttons that save, send, buy or delete, so send a goal that stops short of those unless you mean them.',
     browseInput,
     (args, signal) => args.goal
       ? startBrowsing(store, decider(), { ...args, goal: args.goal }, signal)
@@ -67,9 +65,9 @@ export function createServer(store: SessionStore, decider: () => Decider) {
     args => inspectSession(store, args), true);
 
   add('act',
-    'Do one step yourself in an open session, using a control reference from inspect. The step gets the same effect check as the model steps.',
+    'Do one step yourself in an open session, using a control reference from inspect.',
     z.object({ sessionId, ref: z.string().min(1).max(60), text: z.string().max(4000).optional() }),
-    (args, signal) => actInSession(store, decider(), args, signal));
+    args => actInSession(store, args));
 
   add('close',
     'Close the browser session. The evidence files stay on disk. Closing does not undo anything the session did.',

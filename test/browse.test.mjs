@@ -15,7 +15,6 @@ const holds = (needle) => (label) => label.toLowerCase().includes(needle.toLower
 test('it follows links and returns the answer word for word', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
-    if (id === 'effect') return 'move';
     if (id === 'action') return pick(ask, holds('Reject optional')) ?? pick(ask, holds('link Contact')) ?? '__nothing__';
     if (id.startsWith('answer_')) return pick(ask, label => label.includes('+39')) ?? '__not_here__';
     return undefined;
@@ -33,10 +32,9 @@ test('it follows links and returns the answer word for word', async () => {
   } finally { await site.stop(); }
 });
 
-test('one acting step costs exactly two messages', async () => {
+test('one acting step costs exactly one message', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
-    if (id === 'effect') return 'move';
     if (id === 'action') return pick(ask, holds('link Careers')) ?? '__nothing__';
     if (id.startsWith('answer_')) return '__not_here__';
     return undefined;
@@ -44,18 +42,17 @@ test('one acting step costs exactly two messages', async () => {
   try {
     await run(decider, { url: site.url, goal: 'Open the careers page.' });
     const kinds = decider.seen.map(asks => Object.keys(asks).join('+'));
-    assert.deepEqual(kinds, ['action', 'effect', 'action']);
+    assert.deepEqual(kinds, ['action', 'action']);
   } finally { await site.stop(); }
 });
 
-test('it places supplied values and stops before a commit it may not do', async () => {
+test('it places every supplied value in the field that takes it', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
     if (id === 'bind_full_name') return pick(ask, holds('full name')) ?? '__none__';
     if (id === 'bind_delivery_day') return pick(ask, holds('Delivery day')) ?? '__none__';
     if (id === 'bind_newsletter') return pick(ask, holds('newsletter')) ?? '__none__';
-    if (id === 'action') return pick(ask, holds('Save the request')) ?? '__nothing__';
-    if (id === 'effect') return 'commit';
+    if (id === 'action') return '__nothing__';
     return undefined;
   });
   try {
@@ -64,8 +61,6 @@ test('it places supplied values and stops before a commit it may not do', async 
       goal: 'Ask for a quote for Ada Lovelace, delivered on 2 October 2026, without the newsletter.',
       values: { full_name: 'Ada Lovelace', delivery_day: '2026-10-02', newsletter: 'false' },
     });
-    assert.equal(report.status, 'needs_decision');
-    assert.match(report.need, /acts outside the page/);
     assert.deepEqual(report.placedValues.map(item => item.name).sort(), ['delivery_day', 'full_name', 'newsletter']);
   } finally { await site.stop(); }
 });
@@ -103,7 +98,6 @@ test('it stops offering a step that changed nothing', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
     if (id === 'action') return pick(ask, holds('Accept all cookies')) ?? '__nothing__';
-    if (id === 'effect') return 'move';
     return undefined;
   });
   try {
@@ -141,7 +135,6 @@ test('a control far below the fold is offered only after scrolling', async () =>
       labels.push(ask.choices.map(choice => choice.label));
       return pick(ask, holds('Buried link')) ?? pick(ask, holds('scroll further down')) ?? '__nothing__';
     }
-    if (id === 'effect') return 'move';
     if (id.startsWith('answer_')) return '__not_here__';
     return undefined;
   });
@@ -156,7 +149,6 @@ test('it follows a link that opens a new tab', async () => {
   const site = await startSite();
   const decider = scriptedDecider((id, ask) => {
     if (id === 'action') return pick(ask, holds('new tab')) ?? '__nothing__';
-    if (id === 'effect') return 'move';
     if (id.startsWith('answer_')) return pick(ask, label => label.includes('+39')) ?? '__not_here__';
     return undefined;
   });
@@ -180,7 +172,6 @@ test('it can close a tab it opened and carry on where it was', async () => {
       if (tab && !opened) { opened = true; return tab; }
       return pick(ask, holds('close this tab')) ?? '__nothing__';
     }
-    if (id === 'effect') return 'move';
     if (id.startsWith('answer_')) return '__not_here__';
     return undefined;
   });

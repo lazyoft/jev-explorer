@@ -1,10 +1,10 @@
 import { perform, readBack, readObservation, settle } from './browser/client.js';
 import { buildRequest, type Ask, type Answer, type Decider } from './jev/client.js';
 import { sliceItems } from './jev/slices.js';
-import { askAnswers, askBindings, askEffect, askNextAction, navigableActions, selectableFields, NEXT_SLICE, NONE, NOTHING, NOT_HERE, PREVIOUS_SLICE } from './jev/questions.js';
-import { ExplorerError, needsDecision, needsValue, spent } from './domain/errors.js';
+import { askAnswers, askBindings, askNextAction, navigableActions, selectableFields, NEXT_SLICE, NONE, NOTHING, NOT_HERE, PREVIOUS_SLICE } from './jev/questions.js';
+import { ExplorerError, needsValue, spent } from './domain/errors.js';
 import { trace, saveObservation } from './domain/trace.js';
-import type { Action, Effect, Session } from './domain/types.js';
+import type { Action, Session } from './domain/types.js';
 
 const CONFIDENT = 0.7;
 const ANSWER_CONFIDENT = 0.6;
@@ -77,7 +77,7 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
         throw needsValue('VALUE_NOT_ACCEPTED', `The field "${field.name}" did not keep the value named "${name}". Check the value and send it again.`);
       }
       session.placed[name] = { ref: field.ref, name: field.name, value: wanted };
-      session.steps.push({ action: `put the value "${name}" into "${field.name}"`, effect: 'change', outcome: 'the field kept the value' });
+      session.steps.push({ action: `put the value "${name}" into "${field.name}"`, outcome: 'the field kept the value' });
       session.usage.steps++;
       await trace(session, { kind: 'placed', value: name, field: field.name });
       return true;
@@ -167,21 +167,12 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       if (mark === lastMark && action.kind !== 'scroll') {
         unhelpful.add(mark);
         lastMark = '';
-        session.steps.push({ action: `${action.kind} "${action.name}"`, effect: 'move', outcome: 'chosen twice with no change; not offered again' });
+        session.steps.push({ action: `${action.kind} "${action.name}"`, outcome: 'chosen twice with no change; not offered again' });
         continue;
       }
       lastMark = mark;
 
-      let effect: Effect = 'move';
-      if (!['scroll', 'back', 'close-tab'].includes(action.kind)) {
-        const answers = await ask({ effect: askEffect(session, action) });
-        effect = answers.effect!.id as Effect;
-      }
       const label = `${action.kind} "${action.name}"`;
-
-      if (effect === 'commit' && !session.commitAllowed) {
-        throw needsDecision('COMMIT_NOT_ALLOWED', `The next step ${label} acts outside the page. Allow it, or take over.`);
-      }
 
       try {
         await perform(session.page, action);
@@ -194,17 +185,8 @@ export async function exploreLoop(session: Session, decider: Decider, signal: Ab
       }
       await settle(session.page, 800);
       session.usage.steps++;
-      await trace(session, { kind: 'acted', action: label, effect });
-
-      if (effect === 'commit') {
-        session.awaitingCommit = true;
-        session.steps.push({ action: label, effect, outcome: 'done, but the outcome is not proven' });
-        await read();
-        session.status = 'needs_decision';
-        session.need = `The step ${label} was done. Nothing proves its outcome yet. Check the page, then confirm it.`;
-        return;
-      }
-      session.steps.push({ action: label, effect, outcome: 'done' });
+      await trace(session, { kind: 'acted', action: label });
+      session.steps.push({ action: label, outcome: 'done' });
     }
   } finally {
     session.usage.elapsedMs = Date.now() - started;

@@ -34,24 +34,8 @@ export function askNextAction(session: Session, actions: Action[], slice?: { num
       valuesInHand: Object.keys(session.values),
       ...(slice ? { partOfPage: { number: slice.number, of: slice.count, wholePageSeen: slice.allSeen } } : {}),
     },
-    question: 'Which one of these options moves toward the goal? Closing a pop-up, a banner or a cookie notice that covers the page also counts, because the page cannot be used until it is gone. Refuse what is optional rather than accept it, and never sign in or accept terms to get past it. Use what was already done, so the same step is not repeated. A missing option in this list is not proof that the website lacks it.',
+    question: 'Which one of these options moves toward the goal? Closing a pop-up, a banner or a cookie notice that covers the page also counts, because the page cannot be used until it is gone. Accept a cookie notice rather than refuse it, and take the single button that clears it rather than a panel of settings. Never sign in, subscribe, pay or agree to terms of service to get past something. Use what was already done, so the same step is not repeated. A missing option in this list is not proof that the website lacks it.',
     choices,
-  };
-}
-
-export function askEffect(session: Session, action: Action): Ask {
-  return {
-    state: {
-      goal: session.goal,
-      action: { kind: action.kind, role: action.role, name: action.name, context: action.context },
-      commitAllowed: session.commitAllowed,
-    },
-    question: 'What does this one action do? "move" goes to another view, opens a menu or scrolls. "change" edits a field, a filter or a search on this page. "commit" makes a durable change outside the page, such as save, send, buy, book or delete. A search or a filter is "change", never "commit".',
-    choices: [
-      { id: 'move', label: 'it moves to another view or reveals more of the page' },
-      { id: 'change', label: 'it changes a field, a filter or a search on this page' },
-      { id: 'commit', label: 'it saves, sends, buys, books, deletes or otherwise acts outside the page' },
-    ],
   };
 }
 

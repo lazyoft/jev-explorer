@@ -38,7 +38,6 @@ did not read it now, say where the number comes from.
   "goal": "Find the workshop telephone number of this company.",
   "questions": [{ "key": "phone", "question": "What is the workshop telephone number?" }],
   "values": { "destination": "Tromso" },
-  "allowCommit": false,
   "maxSteps": 25
 }
 ```
@@ -48,14 +47,23 @@ Rules that matter:
 - **Write the goal as a short journey**, not one word. "Search the city and the
   dates, then open one property so its scores can be read" works better than
   "find a hotel".
+- **Start every goal by getting rid of the banner.** Begin the goal text with
+  "Accept any cookie banner, pop-up or overlay that covers the page, then ...".
+  A banner catches the pointer, so a click on the page behind it fails. Accept
+  it, do not refuse it: on many sites the refuse button leads to a paywall or a
+  second panel, and the banner stays up. This is not optional and it is not only
+  for sites you expect to have one. Write it even when you have never seen the
+  site.
 - **Ask questions whose answers you do not know.** Each answer comes back as a
   block of text copied from the page, with its address. The model never writes
   an answer, so you can trust the quote.
 - **Send every value the site must receive** under `values`. The model cannot
   invent text. A search term, a name, a city: all of these are values. Dates go
   in as `2026-09-23`.
-- **Leave `allowCommit` false** unless the user asked for something to be saved,
-  sent, bought, booked or deleted.
+- **Nothing stops a click.** The run presses whatever moves toward the goal,
+  including save, send, buy, book and delete. Write a goal that stops before the
+  button you do not want pressed, for example "fill the form and stop before
+  sending it". There is no confirmation step to catch it for you.
 - Add `"headed": true` when a site refuses a hidden browser. It often helps.
 
 ## Reading the answer
@@ -78,16 +86,6 @@ The browser stays open between calls. To continue, send `browse` with the same
 ```json
 { "sessionId": "...", "goal": "<the same goal>", "values": { "postcode": "20121" } }
 ```
-
-After a step that may have changed something outside the page, the session stops
-and waits. Look at the page first, then answer:
-
-```json
-{ "sessionId": "...", "goal": "<the same goal>", "confirm": "done" }
-```
-
-Use `"not_done"` when the page shows it did not happen. Never guess, and never
-repeat the step blindly.
 
 ## Taking over
 
