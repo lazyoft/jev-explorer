@@ -1,20 +1,25 @@
 ---
 name: jev-explorer
-description: Delegate browser work to the Jev Explorer MCP server instead of reading web pages yourself. Use when a task needs a website visited, searched, filled in or read, and the answer must come with the exact source text. Covers the four tools (browse, inspect, act, close), what to send, what the five statuses mean, and how to carry on a session.
+description: Use when a website needs real interaction before the answer exists: filling a search form, choosing dates, applying filters, clicking through result pages, signing in, or reading a page that only appears once scripts run. It returns the findings with the exact text from the page, and keeps the browser open so you can add a missing value or take over. Do NOT use it when a single fetch of a known address, or an API, would answer the question: that is cheaper and faster. Tools: browse, inspect, act, close.
 ---
 
 # Jev Explorer
 
-## What it is for
+## When to use it, and when not to
 
-A website page is large. Reading it yourself fills your context with markup and
-link lists. This server browses in its own process, with a small model, and
-returns a short report: the findings, the exact text that proves them, and a
-browser that stays open.
+Use it when the answer does not exist until something is done on the site:
 
-Use it when the task is "go to this site and find out X", or "fill this form".
+- a search form, dates or filters must be filled in,
+- results must be opened one by one,
+- a sign-in stands in the way,
+- the page is empty until its scripts run.
 
-Do not use it for a page you can read once with a simple fetch.
+Do not use it for a page whose address you already know and whose text a single
+fetch returns. A browser session and its model calls cost far more than a `curl`.
+
+Whichever you choose: never write a quotation for a page you have not opened. A
+star count, a price or a review score changes after your training ended. If you
+did not read it now, say where the number comes from.
 
 ## The four tools
 
